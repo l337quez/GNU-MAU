@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/app/mau.png" alt="GNU Mau Logo" width="400">
+</p>
+
 # GNU  Mau 😸​​🔧​
 It is tool designed to organize and store commands, credentials, and project-specific information. Although it is primarily aimed at backend and DevOps programmers, anyone who finds it useful can take advantage of it.
 
@@ -54,5 +58,3 @@ Remove a package: poetry remove <package-name>
 Update all packages: poetry update
 ```
 
-Note on Google Keep: 
-> The gkeepapi library requires a Google App Password if you have 2FA enabled. Make sure to set up your credentials as environment variables or within your local config to allow the Todo tab to sync correctly.
