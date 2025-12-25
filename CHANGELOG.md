@@ -1,3 +1,8 @@
+#### ⟳ Changelog Alpha version 0.0.2(2024-14-09)
+- new todo section.
+- add new features relacted to copy, and delete in information section.
+- save the theme in a configuration file
+
 #### ⟳ Changelog Alpha version 0.0.3(2024-12-25)
 -   clean up.
 -   add config inside env file.
@@ -13,3 +18,15 @@
 -   switching from Mongo to Mongite, a local database similar to SQLite.
 -   some validations are added in TODO.
 
+#### ⟳ Changelog Alpha version 0.0.6 (2025-12-18)
+- Notes Section: New feature to write with Markdown, including list and read views.  
+- Database Migration: Switched from MongoDB to Mongite (local database similar to SQLite) for better portability.   
+- Contextual TODOs: Updated the TODO tab to manage tasks per project instead of a global list.
+- Markdown Support: Added Markdown formatting options within the TODO section.
+- UI Enhancements: Updated the panel icon and added new input validations.
+
+#### ⟳ Changelog Alpha version 0.0.7 (2025-12-25)
+- bug fixes project selection when opening the application
+- The default folder for selecting the project icon image has been changed.
+- A bug that caused the application to minimize to the system tray when minimized has been fixed; now it only minimizes to the system tray when the main window is closed.
+- when change icon for project the icon is not updated in the project list fixed.

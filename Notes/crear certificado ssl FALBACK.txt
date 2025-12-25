@@ -1,0 +1,13 @@
+sudo openssl req -x509 -newkey rsa:4096 -days 365 -nodes \
+-keyout lua-resty-acme-ssl-fallback.key \
+-out lua-resty-acme-ssl-fallback.crt \
+-subj "/CN=lua-resty-acme-ssl-fallback/O=Clientify ACME Fallback"
+
+
+MOVEMOS LOS CERTIFICADOS
+sudo mv lua-resty-acme-ssl-fallback.key /etc/ssl/
+sudo mv lua-resty-acme-ssl-fallback.crt /etc/ssl/
+
+LE DAMOS PERMISOS
+sudo chmod 600 /etc/ssl/lua-resty-acme-ssl-fallback.key
+sudo chmod 644 /etc/ssl/lua-resty-acme-ssl-fallback.crt

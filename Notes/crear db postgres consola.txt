@@ -1,0 +1,13 @@
+si no abre postgre en windows debes hacer esto
+& "C:\Program Files\PostgreSQL\15\bin\psql.exe" -U postgres
+
+
+para listar db
+\l
+
+para salir 
+\q
+
+
+para crear usa elsiguiente comando y cambia dabase_name por el nombre que desea
+CREATE DATABASE dabase_name;

@@ -10,10 +10,10 @@ class ProjectInfoTab(QWidget):
         self.main_window = main_window
         self.info_layout = QVBoxLayout()
 
-        self.project_name_label = QLabel("Nombre del Proyecto")
+        self.project_name_label = QLabel("Project name")
         self.info_layout.addWidget(self.project_name_label)
-        
-        self.project_description_label = QLabel("Descripción del Proyecto")
+
+        self.project_description_label = QLabel("Project description")
         self.info_layout.addWidget(self.project_description_label)
 
         buttons_layout = QHBoxLayout()
@@ -51,8 +51,8 @@ class ProjectInfoTab(QWidget):
         self.set_editing_enabled(False)
 
     def update_project_info(self, name, description, info):
-        self.project_name_label.setText(f"Nombre: {name}")
-        self.project_description_label.setText(f"Descripción: {description}")
+        self.project_name_label.setText(f"Name: {name}")
+        self.project_description_label.setText(f"Description: {description}")
         self.clear_table()
         info_dict = info if isinstance(info, str) else info
         for key, value in info_dict.items():

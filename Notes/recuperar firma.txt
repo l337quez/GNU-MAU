@@ -1,0 +1,12 @@
+from digital_signature.models import Signature, SignaturesSigner
+
+firma = Signature.all_objects.get(id=8567)
+print(f"ANTES - title: {firma.title}, created_by_user_id: {firma.created_by_user_id}, is_deleted: {firma.is_deleted}, deleted_at: {firma.deleted_at}")
+
+# Restaurar
+firma.is_deleted = False
+firma.deleted_at = None
+firma.save()
+
+# Verificar estado después
+print(f"DESPUÉS - title: {firma.title}, created_by_user_id: {firma.created_by_user_id}, is_deleted: {firma.is_deleted}, deleted_at: {firma.deleted_at}")

@@ -1,7 +1,6 @@
 import sys
 import os
-# from pymongo import MongoClient # Comentada o eliminada en la revisión anterior
-from mongita import MongitaClientDisk # Importada en la revisión anterior
+from mongita import MongitaClientDisk
 from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                                QWidget, QVBoxLayout, QSystemTrayIcon,
                                QMenu, QListWidget, QScrollArea, QLabel,
@@ -30,18 +29,32 @@ if sys.platform.startswith('win'):
 class GIFLabel(QLabel):
     def __init__(self, gif_path):
         super().__init__()
-        self.movie = QMovie(gif_path)
-        self.setMovie(self.movie)
-        self.movie.start()
+        self.movie_obj = None 
+        if os.path.exists(gif_path):
+            self.movie_obj = QMovie(gif_path)
+            self.setMovie(self.movie_obj)
+            self.movie_obj.start()
 
     def currentPixmap(self):
-        return self.movie.currentPixmap()
+        if isinstance(self.movie_obj, QMovie) and self.movie_obj.isValid():
+            return self.movie_obj.currentPixmap()
+        return QPixmap()
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GNU Mau")
         self.setGeometry(300, 300, 800, 600)
+
+        # --- CAMBIO 1: Inicializar directorio base storage ---
+        self.storage_dir = os.path.join(os.path.dirname(__file__), "storage")
+        if not os.path.exists(self.storage_dir):
+            try:
+                os.makedirs(self.storage_dir)
+                print(f"Directorio principal 'storage' creado en: {self.storage_dir}")
+            except OSError as e:
+                print(f"Error al crear directorio storage: {e}")
+        # -----------------------------------------------------
 
         self.config_path = os.path.join(os.path.expanduser("~"), ".myapp", "config.json")
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
@@ -57,8 +70,8 @@ class MainWindow(QMainWindow):
         self.tray_icon = QSystemTrayIcon(appIcon, parent=self)
         self.tray_icon.setToolTip("GNU Mau")
         tray_menu = QMenu()
-        show_action = QAction("Mostrar", self)
-        quit_action = QAction("Salir", self)
+        show_action = QAction("Show", self)
+        quit_action = QAction("Quit", self)
         tray_menu.addAction(show_action)
         tray_menu.addAction(quit_action)
         self.tray_icon.setContextMenu(tray_menu)
@@ -72,23 +85,21 @@ class MainWindow(QMainWindow):
         self.current_project_description = ""
         self.current_project_item = None
         self.current_project_info = {}
-        self.current_project_id = "default_project_id" # Se actualiza cuando se selecciona un proyecto o se crea uno nuevo
+        self.current_project_id = "default_project_id" 
         self.db_name = "projects_db"
 
-        print("Conectando a Mongita...")
+        print("Connecting to Mongita...")
         mongita_db_dir = os.path.join(os.path.dirname(__file__), "mongita_data")
         os.environ["MONGITA_DIR"] = mongita_db_dir
         self.client = MongitaClientDisk(mongita_db_dir)
         self.db = self.client[self.db_name]
-
-        print("Conectando a MongoDB...") # Este mensaje ahora se refiere a Mongita
         self.create_collections()
 
         if self.db.projects.count_documents({}) == 0:
-            print("Insertando un proyecto de prueba en Mongita...")
+            print("Inserting a test project into Mongita...")
             self.db.projects.insert_one({
-                "name": "Proyecto Demo",
-                "description": "Este es un proyecto de prueba.",
+                "name": "Demo project",
+                "description": "This is a test project.",
                 "icon_path": "assets/project_images/default_icon.png"
             })
 
@@ -96,7 +107,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.project_tab = ProjectTab(self)
         self.project_info_tab = ProjectInfoTab(self)
-        # Asegurarse de que project_id se actualice correctamente en display_project_info
         self.project_todo_tab = ProjectTodoTab(self, project_id=self.current_project_id)
         self.project_note_tab = ProjectNoteTab(self)
         self.setting_tab = SettingTab(self)
@@ -154,22 +164,20 @@ class MainWindow(QMainWindow):
 
     def apply_theme(self, dark_mode):
         if dark_mode:
-            with open("dark_theme.qss", "r") as f:
-                dark_style_sheet = f.read()
-            self.setStyleSheet(dark_style_sheet)
+            try:
+                with open("dark_theme.qss", "r") as f:
+                    dark_style_sheet = f.read()
+                self.setStyleSheet(dark_style_sheet)
+            except FileNotFoundError:
+                print("Tema oscuro no encontrado")
         else:
             self.setStyleSheet("")
 
     def create_collections(self):
-        # Mongita crea las colecciones automáticamente al insertar el primer documento.
-        # Estas llamadas a create_collection son inofensivas pero no estrictamente necesarias
-        # para el funcionamiento de Mongita. Se mantienen solo para consistencia si se desea.
         if 'projects' not in self.db.list_collection_names():
             print("Mongita: Colección 'projects' creada automáticamente al primer insert.")
-            # self.db.create_collection('projects') # No es necesario para Mongita
         if 'todos' not in self.db.list_collection_names():
             print("Mongita: Colección 'todos' creada automáticamente al primer insert.")
-            # self.db.create_collection('todos') # No es necesario para Mongita
 
     def add_create_project_button(self):
         create_project_button = QPushButton("Create Project")
@@ -180,9 +188,7 @@ class MainWindow(QMainWindow):
         
         create_project_item = QListWidgetItem(self.project_list_widget)
         create_project_item.setSizeHint(create_project_button.sizeHint())
-        # --- CAMBIO AQUI: Marcar el item para que display_project_info lo ignore ---
-        create_project_item.setData(Qt.UserRole, None) # O un valor distintivo como "CREATE_NEW_PROJECT_ID"
-        # --- FIN DEL CAMBIO ---
+        create_project_item.setData(Qt.UserRole, None) 
         self.project_list_widget.setItemWidget(create_project_item, create_project_button)
 
     def show_create_project_form(self):
@@ -190,25 +196,38 @@ class MainWindow(QMainWindow):
         self.current_project_name = ""
         self.current_project_description = ""
         self.current_project_info = {}
-        self.current_project_id = None # Reiniciar el ID para indicar un nuevo proyecto
+        self.current_project_id = None 
         self.project_tab.name_input.clear()
         self.project_tab.description_input.clear()
-        self.project_tab.clear_table() # Limpiar tabla de info adicional al crear uno nuevo
-        self.project_tab.set_editing_enabled(True) # Habilitar edición para nuevo proyecto
+        self.project_tab.clear_table() 
+        self.project_tab.set_editing_enabled(True) 
         self.tabs.setCurrentWidget(self.project_tab)
 
     def load_projects(self):
         self.gif_labels = []
         projects_collection = self.db.projects
         projects = projects_collection.find()
-        # Limpiar la lista existente antes de cargar nuevos proyectos
+        
         self.project_list_widget.clear()
-        self.add_create_project_button() # Volver a añadir el botón "Create Project"
+        self.add_create_project_button() 
+        
         for project in projects:
             description = project['description'] if len(project['description']) <= 8 else project['description'][:8] + "..."
             item = QListWidgetItem(f"{project['name']}: {description}")
-            item.setData(Qt.UserRole, project["_id"]) # Asegúrate de almacenar el _id
+            
+            project_id = str(project["_id"]) 
+            item.setData(Qt.UserRole, project_id) 
+
+            # --- CORRECCIÓN 1: Cargar la ruta real de la DB al iniciar ---
             icon_path = project.get('icon_path', "assets/project_images/default_icon.png")
+            item.setData(Qt.UserRole + 1, icon_path) 
+
+            project_folder_path = os.path.join(self.storage_dir, project_id)
+            if not os.path.exists(project_folder_path):
+                try:
+                    os.makedirs(project_folder_path)
+                except OSError as e:
+                    print(f"Error al crear la carpeta: {e}")
 
             if icon_path.endswith('.gif'):
                 gif_label = GIFLabel(icon_path)
@@ -216,27 +235,33 @@ class MainWindow(QMainWindow):
                 item.setIcon(QIcon(gif_label.currentPixmap()))
             else:
                 item.setIcon(QIcon(icon_path))
+            
             item.icon_path = icon_path
             self.project_list_widget.addItem(item)
 
+        if self.project_list_widget.count() > 1:
+            first_project_item = self.project_list_widget.item(1)
+            self.project_list_widget.setCurrentItem(first_project_item)
+            self.display_project_info(first_project_item)
+
     def update_gif_icons(self):
         for item, gif_label in self.gif_labels:
-            item.setIcon(QIcon(gif_label.currentPixmap()))
+            try:
+                pix = gif_label.currentPixmap()
+                if pix and not pix.isNull():
+                    item.setIcon(QIcon(pix))
+            except Exception:
+                continue
 
     @Slot()
     def display_project_info(self, item):
-        # --- CAMBIO AQUI: Manejar el clic en el botón "Create Project" ---
         project_id = item.data(Qt.UserRole)
-        if project_id is None: # Si el item no tiene un ID de proyecto válido
+        if project_id is None: 
             self.show_create_project_form()
-            return # Salir de la función
-        # --- FIN DEL CAMBIO ---
+            return 
 
         project = self.db.projects.find_one({"_id": project_id})
         if not project:
-            print("No se encontró ningún documento con ese _id:", project_id)
-            # Opcional: podrías remover el item de la lista si el proyecto ya no existe en la DB
-            # self.project_list_widget.takeItem(self.project_list_widget.row(item))
             return
 
         self.current_project_item = item
@@ -244,6 +269,9 @@ class MainWindow(QMainWindow):
         self.current_project_name = project["name"]
         self.current_project_description = project["description"]
         self.current_project_info = project.get("info", {})
+
+        icon_path = project.get('icon_path', "assets/project_images/default_icon.png")
+        item.setData(Qt.UserRole + 1, icon_path)
 
         self.project_info_tab.update_project_info(
             self.current_project_name,
@@ -255,7 +283,6 @@ class MainWindow(QMainWindow):
             self.current_project_description
         )
 
-        icon_path = project.get('icon_path', "assets/project_images/default_icon.png")
         if icon_path.endswith('.gif'):
             gif_label = GIFLabel(icon_path)
             icon = QIcon(gif_label.currentPixmap())
@@ -264,7 +291,8 @@ class MainWindow(QMainWindow):
         self.current_project_item.setIcon(icon)
 
         self.project_todo_tab.project_id = self.current_project_id
-        self.project_todo_tab.load_todos()
+        self.project_todo_tab.update_project_id(self.current_project_id)
+        self.project_note_tab.set_project_id(self.current_project_id)
 
         self.project_info_tab.clear_search()
         self.project_tab.enable_editing()
@@ -272,43 +300,49 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def update_project_icon(self, project_name, icon_path):
-        # Es más robusto buscar por _id, pero si project_name es único, puede funcionar.
-        # Se asume que el project_name en este contexto corresponde al current_project_name
-        # del proyecto actualmente seleccionado.
         if self.current_project_id:
             for i in range(self.project_list_widget.count()):
                 item = self.project_list_widget.item(i)
                 if item.data(Qt.UserRole) == self.current_project_id:
+                    # --- CORRECCIÓN 3: Actualizar la "mochila" de datos ---
+                    item.setData(Qt.UserRole + 1, icon_path)
+                    
                     if icon_path.endswith('.gif'):
-                        # Asegurarse de que el GIFLabel sea el correcto o crear uno nuevo si es necesario
                         found = False
                         for idx, (existing_item, existing_gif_label) in enumerate(self.gif_labels):
                             if existing_item == item:
-                                existing_gif_label = GIFLabel(icon_path) # Recrear para la nueva ruta
+                                existing_gif_label = GIFLabel(icon_path) 
                                 self.gif_labels[idx] = (item, existing_gif_label)
                                 item.setIcon(QIcon(existing_gif_label.currentPixmap()))
                                 found = True
                                 break
-                        if not found: # Si no se encontró en gif_labels, añadirlo
+                        if not found: 
                             gif_label = GIFLabel(icon_path)
                             self.gif_labels.append((item, gif_label))
                             item.setIcon(QIcon(gif_label.currentPixmap()))
                     else:
                         item.setIcon(QIcon(icon_path))
-                    item.icon_path = icon_path # Actualizar la ruta en el item
+                    item.icon_path = icon_path 
                     break
-
 
     @Slot()
     def closeEvent(self, event):
-        # Aunque Mongita no lo requiere tan estrictamente como PyMongo, es buena práctica.
-        self.client.close()
-        event.accept()
+        if self.tray_icon.isVisible():
+            self.hide()
+            self.tray_icon.showMessage(
+                "GNU Mau",
+                "The application continues to run in the background.",
+                QSystemTrayIcon.Information,
+                2000
+            )
+            event.ignore() 
+        else:
+            self.client.close() 
+            event.accept()
 
     @Slot()
     def changeEvent(self, event):
         if event.type() == QEvent.WindowStateChange and self.isMinimized():
-            self.hide()
             self.tray_icon.showMessage(
                 "Minimizado",
                 "La aplicación se ha minimizado a la bandeja del sistema",
@@ -321,16 +355,9 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
-    print("Creando ventana principal...")
     window = MainWindow()
-
-    print("Mostrando ventana principal...")
     window.show()
-
     def on_exit():
-        print("Cerrando aplicación...")
-
+        print("closing application...")
     app.aboutToQuit.connect(on_exit)
-
     sys.exit(app.exec())
