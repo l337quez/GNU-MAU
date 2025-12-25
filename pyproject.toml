@@ -1,0 +1,23 @@
+[project]
+name = "gnu-mau"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "l337quez",email = "l337quez.dev@gmail.com"}
+]
+license = {text = "GPL V3"}
+readme = "README.md"
+requires-python = "3.11.4"
+dependencies = [
+    "pyside6 (==6.5.0)",
+    "gkeepapi (==0.17.0)",
+    "markdown2 (>=2.5.4,<3.0.0)",
+    "mongita (>=1.2.0,<2.0.0)",
+    "numpy (<2)",
+    "dotenv (>=0.9.9,<0.10.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

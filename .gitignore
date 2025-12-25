@@ -1,5 +1,6 @@
 .__pycache__
 .env
 .dist
-.qodo
 .mongita_data
+./Notes/*
+.storage

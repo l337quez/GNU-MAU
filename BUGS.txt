@@ -1,3 +1,0 @@
-*  NO se esta guardando json sino string 🙁
-
-* El tag esta separado y deberia estar en cada entrada y no global5
