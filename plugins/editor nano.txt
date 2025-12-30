@@ -1,6 +1,0 @@
-para buscar dentro de un archivo
-ctrl + w
-
-para buscar una linea en especifico
-
-ctrl + _

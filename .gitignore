@@ -2,8 +2,7 @@
 .env
 .dist
 .mongita_data/*
-./Notes/*
-.storage
-.build
-.notes
-.plugins
+storage/
+build/
+notes/
+plugins/
