@@ -1,0 +1,8 @@
+* CONSEGUIR MASTER PROCESS DE OPENRESTY
+ps aux | grep nginx | grep 'master process'
+
+*ELIMINAR EL PROCESO
+usando el numero encontrado
+
+* ACTIVAR OPENRESTY
+sudo /usr/local/openresty/bin/openresty -c /usr/local/openresty/nginx/conf/nginx.conf

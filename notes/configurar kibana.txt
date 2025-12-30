@@ -1,0 +1,35 @@
+4. Configurar Kibana
+Edita el archivo de configuración /etc/kibana/kibana.yml para ajustar los parámetros necesarios. Por ejemplo:
+
+Para que Kibana escuche en todas las interfaces (útil si deseas acceder desde otras máquinas):
+
+yaml
+Copiar
+server.host: "0.0.0.0"
+Verifica que la URL de Elasticsearch sea la correcta:
+
+yaml
+Copiar
+elasticsearch.hosts: ["http://localhost:9200"]
+5. Iniciar y habilitar el servicio de Kibana
+Inicia el servicio y habilítalo para que se inicie automáticamente con el sistema:
+
+bash
+Copiar
+sudo systemctl enable kibana
+sudo systemctl start kibana
+6. Verificar el estado de Kibana
+Comprueba que Kibana esté corriendo correctamente:
+
+bash
+Copiar
+sudo systemctl status kibana
+7. Acceder a Kibana
+Abre tu navegador y accede a:
+
+cpp
+Copiar
+http://<IP_DEL_SERVIDOR>:5601
+Reemplaza <IP_DEL_SERVIDOR> con la dirección IP de tu servidor. Si estás en la misma máquina, puedes usar http://localhost:5601.
+
+Con estos pasos deberías tener Kibana instalado y funcionando en tu servidor Ubuntu. ¡Suerte con la instalación!

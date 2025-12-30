@@ -1,0 +1,8 @@
+# Setear rama para CD CI
+```
+git fetch origin
+git reset --hard origin/develop
+```
+  
+
+en el servidor es bueno configurar la rama de esta manera para garantizar que se actualice bien

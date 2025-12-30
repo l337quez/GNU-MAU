@@ -1,0 +1,68 @@
+Comando,Descripción,Categoría
+ls,Listar el contenido de un directorio,Navegación
+cd,Cambiar de directorio,Navegación
+pwd,Mostrar el directorio actual,Navegación
+mkdir,Crear un nuevo directorio,Directorio
+rmdir,Eliminar un directorio vacío,Directorio
+rm,Eliminar archivos o directorios,Archivo
+cp,Copiar archivos o directorios,Archivo
+mv,Mover o renombrar archivos o directorios,Archivo
+touch,Crear un archivo vacío o actualizar la fecha de modificación,Archivo
+cat,Concatenar y mostrar el contenido de archivos,Archivo
+echo,Mostrar un mensaje en la pantalla,Texto
+grep,Buscar texto en archivos,Texto
+find,Buscar archivos y directorios,Búsqueda
+locate,Encontrar archivos por nombre,Búsqueda
+chmod,Cambiar permisos de archivos o directorios,Permisos
+chown,Cambiar el propietario de archivos o directorios,Permisos
+ps,Mostrar los procesos en ejecución,Procesos
+top,Mostrar los procesos en ejecución en tiempo real,Procesos
+htop,Mostrar los procesos en ejecución en tiempo real (mejorado),Procesos
+kill,Terminar procesos,Procesos
+df,Mostrar el uso del sistema de archivos,Sistema
+du,Mostrar el uso de disco de archivos y directorios,Sistema
+free,Mostrar el uso de memoria,Sistema
+uname,Mostrar información del sistema,Sistema
+uptime,Mostrar el tiempo de actividad del sistema,Sistema
+hostname,Mostrar o establecer el nombre del host,Sistema
+date,Mostrar o establecer la fecha y hora,Sistema
+whoami,Mostrar el nombre del usuario actual,Usuario
+id,Mostrar información del usuario y grupo,Usuario
+useradd,Agregar un nuevo usuario,Usuario
+userdel,Eliminar un usuario,Usuario
+usermod,Modificar un usuario,Usuario
+groupadd,Agregar un nuevo grupo,Grupo
+groupdel,Eliminar un grupo,Grupo
+groupmod,Modificar un grupo,Grupo
+passwd,Cambiar la contraseña de un usuario,Usuario
+su,Cambiar de usuario,Usuario
+sudo,Ejecutar un comando como superusuario,Usuario
+man,Mostrar el manual de un comando,Ayuda
+help,Mostrar ayuda para un comando interno del shell,Ayuda
+apt-get,Gestor de paquetes en Debian y Ubuntu,Paquetes
+yum,Gestor de paquetes en CentOS y Fedora,Paquetes
+dnf,Gestor de paquetes en Fedora,Paquetes
+pacman,Gestor de paquetes en Arch Linux,Paquetes
+snap,Gestor de paquetes de Snap,Paquetes
+systemctl,Controlar el sistema y los servicios,Sistema
+journalctl,Ver logs del sistema,Sistema
+service,Ejecutar scripts de inicio de servicios,Sistema
+ssh,Conectar a un servidor de forma segura,Red
+scp,Copiar archivos entre servidores de forma segura,Red
+rsync,Sincronizar archivos y directorios,Red
+ftp,Transferir archivos usando el protocolo FTP,Red
+wget,Descargar archivos de la web,Red
+curl,Transferir datos desde o hacia un servidor,Red
+ping,Enviar paquetes ICMP ECHO_REQUEST a un host,Red
+traceroute,Mostrar la ruta que siguen los paquetes a un host,Red
+netstat,"Mostrar conexiones de red, tablas de enrutamiento y estadísticas",Red
+ifconfig,Configurar interfaces de red,Red
+ip,Mostrar y manipular configuraciones de red,Red
+iptables,Administrar reglas de cortafuegos,Red
+docker,Administrar contenedores Docker,Contenedores
+kubectl,Administrar clústeres de Kubernetes,Contenedores
+tar,Archivar archivos,Compresión
+gzip,Comprimir archivos,Compresión
+gunzip,Descomprimir archivos gzip,Compresión
+zip,Comprimir archivos en formato zip,Compresión
+unzip,Descomprimir archivos zip,Compresión
