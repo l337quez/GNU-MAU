@@ -1,6 +1,0 @@
-* conectar con un db
-   psql -U tu_usuario -d tu_base_de_datos
-
-* ver tabla completa 
-  
-\x

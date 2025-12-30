@@ -151,9 +151,16 @@ class MainWindow(QMainWindow):
 
     def save_sidebar_position(self):
         position = self.dockWidgetArea(self.dock_widget)
-        self.config["sidebar_position"] = int(position)
+        self.config["sidebar_position"] = position.value
         with open(self.config_path, 'w') as f:
             json.dump(self.config, f, indent=4)
+
+    def move_sidebar(self, area):
+        """
+        Move the dock widget to the specified position.
+        area: A Qt.DockWidgetArea value (Left, Right, Top, Bottom)
+        """
+        self.addDockWidget(area, self.dock_widget)
 
     def load_config(self):
         if os.path.exists(self.config_path):
