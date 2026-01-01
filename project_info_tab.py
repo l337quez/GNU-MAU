@@ -2,7 +2,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QHBoxLay
                                QCompleter, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QHBoxLayout, QApplication, QFileDialog, QAbstractItemView)
 from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
-import json
+import json, sys, os
+from utils import get_resource_path
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
@@ -50,6 +51,7 @@ class ProjectInfoTab(QWidget):
         self.setLayout(self.info_layout)
         self.set_editing_enabled(False)
 
+
     def update_project_info(self, name, description, info):
         self.project_name_label.setText(f"Name: {name}")
         self.project_description_label.setText(f"Description: {description}")
@@ -81,19 +83,19 @@ class ProjectInfoTab(QWidget):
         actions_widget.setLayout(actions_layout)
 
         copy_button = QPushButton()
-        copy_button.setIcon(QIcon("assets/icons/icon_copy.png"))
+        copy_button.setIcon(QIcon(get_resource_path("assets/icons/icon_copy.png")))
         copy_button.setMaximumSize(24, 24)
         copy_button.clicked.connect(lambda: self.copy_to_clipboard(value))
         actions_layout.addWidget(copy_button)
 
         delete_button = QPushButton()
-        delete_button.setIcon(QIcon("assets/icons/delete.png"))
+        delete_button.setIcon(QIcon(get_resource_path("assets/icons/delete.png")))
         delete_button.setMaximumSize(24, 24)
         delete_button.clicked.connect(lambda: self.delete_row(row_position))
         actions_layout.addWidget(delete_button)
 
         save_button = QPushButton()
-        save_button.setIcon(QIcon("assets/icons/save.png"))
+        save_button.setIcon(QIcon(get_resource_path("assets/icons/save.png")))
         save_button.setMaximumSize(24, 24)
         save_button.clicked.connect(lambda: self.save_row(row_position))
         actions_layout.addWidget(save_button)

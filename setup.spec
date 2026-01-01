@@ -13,9 +13,12 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(base_path, 'assets'), 'assets'),
-        (os.path.join(base_path, 'plugins'), 'plugins'),
     ],
-    hiddenimports=['project_tab', 'project_info_tab', 'project_todo_tab', 'about_tab', 'setting_tab', 'icon', 'dark_theme', 'config'],
+    hiddenimports=[
+        'PySide6.QtXml', 
+        'PySide6.QtOpenGL',
+        'mongita'
+    ],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
@@ -29,6 +32,9 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
+    a.binaries,
+    a.zipfiles,    
+    a.datas,
     a.scripts,
     [],
     exclude_binaries=True,
@@ -39,7 +45,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,
+    console=True,
     icon='assets/app/mau.ico'
 )
 

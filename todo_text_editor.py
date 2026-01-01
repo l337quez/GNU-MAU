@@ -8,65 +8,64 @@ class TodoTextEditor(QTextEdit):
         super().__init__(parent)
         self.setLineWrapMode(QTextEdit.WidgetWidth) 
         self.setPlaceholderText("Write your notes and assignments here...")
-        self.setUndoRedoEnabled(True) 
+        self.setUndoRedoEnabled(True)
         self.setMouseTracking(True)
+        #self.setStyleSheet("font-family: 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.4;")
 
     def mouseMoveEvent(self, event):
-        pos = event.position().toPoint()
-        cursor = self.cursorForPosition(pos)
-        if cursor.positionInBlock() <= 3:
-            text = cursor.block().text()
-            if "☐" in text[:5] or "☑" in text[:5]:
-                self.viewport().setCursor(Qt.ArrowCursor)
-                return
-        self.viewport().setCursor(Qt.IBeamCursor)
+        cursor = self.cursorForPosition(event.position().toPoint())
+        
+        cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
+        char = cursor.selectedText()
+        
+        if char in ["☐", "☑"]:
+            self.viewport().setCursor(Qt.PointingHandCursor)
+        else:
+            self.viewport().setCursor(Qt.IBeamCursor)
+        
         super().mouseMoveEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            # Usar el cursor de la posición del click
-            click_pos = self.cursorForPosition(event.position().toPoint())
-            block = click_pos.block()
-            line_text = block.text()
+            cursor = self.cursorForPosition(event.position().toPoint())
             
-            # Solo actuar si el clic es al inicio (zona del checkbox)
-            if click_pos.positionInBlock() <= 3:
-                has_box = "☐" in line_text[:5]
-                has_check = "☑" in line_text[:5]
+            check_cursor = QTextCursor(cursor)
+            check_cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
+            char_right = check_cursor.selectedText()
 
-                if has_box or has_check:
-                    # 1. Crear un cursor específico para la edición
-                    edit_cursor = QTextCursor(block)
-                    
-                    # 2. Buscar el índice real del símbolo
-                    idx = line_text.find("☐") if has_box else line_text.find("☑")
-                    char_to_insert = "☑" if has_box else "☐"
+            check_cursor.setPosition(cursor.position()) # Reset
+            check_cursor.movePosition(QTextCursor.Left, QTextCursor.KeepAnchor)
+            char_left = check_cursor.selectedText()
 
-                    if idx != -1:
-                        # 3. Posicionar y seleccionar el carácter
-                        edit_cursor.setPosition(block.position() + idx)
-                        edit_cursor.movePosition(QTextCursor.NextCharacter, QTextCursor.KeepAnchor)
-                        
-                        # 4. Insertar texto a través del documento para asegurar que se emita textChanged
-                        self.document().beginUndoBlock()
-                        edit_cursor.insertText(char_to_insert)
-                        self.document().endUndoBlock()
-                        
-                        # 5. ACTUALIZACIÓN CRÍTICA:
-                        # Establecemos el cursor del widget en la misma posición para que el editor
-                        # reconozca el foco y el cambio de contenido.
-                        self.setTextCursor(edit_cursor)
-                        
-                        # Forzar el refresco de la interfaz
-                        self.viewport().update()
-                        
-                        # Emitir manualmente por si acaso, aunque insertText ya debería hacerlo
-                        self.textChanged.emit() 
-                        
-                        event.accept()
-                        return
+            target_char = ""
+            direction = None
 
-        # Si no fue clic en checkbox, procesar normal
+            if char_right in ["☐", "☑"]:
+                target_char = char_right
+                direction = "right"
+            elif char_left in ["☐", "☑"]:
+                target_char = char_left
+                direction = "left"
+
+            if target_char:
+                new_char = "☑" if target_char == "☐" else "☐"
+                
+                edit_cursor = QTextCursor(cursor)
+                if direction == "left":
+                    edit_cursor.movePosition(QTextCursor.Left)
+                
+                edit_cursor.movePosition(QTextCursor.Right, QTextCursor.KeepAnchor)
+                
+                edit_cursor.insertText(new_char)
+                
+                # IMPORTANTE: Forzar actualización visual inmediata
+                self.viewport().update()
+                
+                # Emitimos señal para que se guarde en la base de datos
+                self.textChanged.emit()
+                
+                return # Detenemos el evento aquí para que no mueva el cursor de escritura
+
         super().mousePressEvent(event)
 
     def add_checkboxes_to_selected_text(self):
@@ -84,9 +83,9 @@ class TodoTextEditor(QTextEdit):
             while cursor.position() < end:
                 cursor.movePosition(QTextCursor.StartOfBlock)
                 txt = cursor.block().text()
-                if not (txt.startswith("☐") or txt.startswith("☑")):
+                # Evitamos poner doble checkbox
+                if not (txt.strip().startswith("☐") or txt.strip().startswith("☑")):
                     cursor.insertText("☐ ")
-                    # Ajustar el final de la selección por el nuevo texto
                     end += 2
                 if not cursor.movePosition(QTextCursor.NextBlock):
                     break
@@ -97,8 +96,7 @@ class TodoTextEditor(QTextEdit):
 if __name__ == '__main__':
     app = QApplication([])
     editor = TodoTextEditor()
-    editor.setPlainText("☐ Tarea 1\n☑ Tarea 2")
-    editor.setWindowTitle("Todo Editor")
+    editor.setPlainText(" ☐ Task indented (now working)\n☑ Task completed")
     editor.resize(400, 300)
     editor.show()
     sys.exit(app.exec())
