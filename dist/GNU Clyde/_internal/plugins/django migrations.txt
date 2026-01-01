@@ -1,9 +1,0 @@
-si queremos deshacernos de las migraciones en una aplicacion
-
-python manage.py migrate app_name zero
-
-
-*************************************
-ver las migraciones ejecutadas de una aplicacion
-
-python manage.py showmigrations app_name
