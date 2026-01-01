@@ -7,7 +7,7 @@ from PySide6.QtCore import Slot, Qt
 import json
 from PySide6.QtGui import QIcon, QClipboard
 from bson.objectid import ObjectId
-
+from utils import get_resource_path
 class ProjectTab(QWidget):
     def __init__(self, main_window):
         super().__init__()
@@ -65,6 +65,7 @@ class ProjectTab(QWidget):
         self.setLayout(layout)
         self.set_editing_enabled(False)
 
+    
     @Slot()
     def enable_editing(self):
         self.name_input.setReadOnly(False)
@@ -227,7 +228,7 @@ class ProjectTab(QWidget):
         self.additional_info_table.setItem(row_position, 0, QTableWidgetItem(key))
         self.additional_info_table.setItem(row_position, 1, QTableWidgetItem(value))
         copy_button = QPushButton()
-        copy_button.setIcon(QIcon("assets/icons/icon_copy.png"))
+        copy_button.setIcon(QIcon(get_resource_path("assets/icons/icon_copy.png")))
         copy_button.setMaximumSize(24, 24)
         copy_button.clicked.connect(lambda: self.copy_to_clipboard(value))
         self.additional_info_table.setCellWidget(row_position, 2, copy_button)

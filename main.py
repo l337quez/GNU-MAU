@@ -1,5 +1,3 @@
-import sys
-import os
 from mongita import MongitaClientDisk
 from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                                QWidget, QVBoxLayout, QSystemTrayIcon,
@@ -7,16 +5,19 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                                QDockWidget, QListWidgetItem, QPushButton)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer
+from PySide6.QtWidgets import QSizePolicy
+import json, sys, os
+from dotenv import load_dotenv
+# Mau resources
+from about_tab import AboutTab
+from setting_tab import SettingTab
+from icon import icon
 from project_tab import ProjectTab
 from project_info_tab import ProjectInfoTab
 from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
-from about_tab import AboutTab
-from setting_tab import SettingTab
-from icon import icon
-from PySide6.QtWidgets import QSizePolicy
-import json
-from dotenv import load_dotenv
+from utils import get_resource_path
+
 
 # load env file
 load_dotenv()
@@ -30,10 +31,16 @@ class GIFLabel(QLabel):
     def __init__(self, gif_path):
         super().__init__()
         self.movie_obj = None 
-        if os.path.exists(gif_path):
-            self.movie_obj = QMovie(gif_path)
+        resolved_path = get_resource_path(gif_path)
+        if os.path.exists(resolved_path):
+            self.movie_obj = QMovie(resolved_path)
             self.setMovie(self.movie_obj)
             self.movie_obj.start()
+
+        # if os.path.exists(gif_path):
+        #     self.movie_obj = QMovie(gif_path)
+        #     self.setMovie(self.movie_obj)
+        #     self.movie_obj.start()
 
     def currentPixmap(self):
         if isinstance(self.movie_obj, QMovie) and self.movie_obj.isValid():
@@ -151,9 +158,16 @@ class MainWindow(QMainWindow):
 
     def save_sidebar_position(self):
         position = self.dockWidgetArea(self.dock_widget)
-        self.config["sidebar_position"] = int(position)
+        self.config["sidebar_position"] = position.value
         with open(self.config_path, 'w') as f:
             json.dump(self.config, f, indent=4)
+
+    def move_sidebar(self, area):
+        """
+        Move the dock widget to the specified position.
+        area: A Qt.DockWidgetArea value (Left, Right, Top, Bottom)
+        """
+        self.addDockWidget(area, self.dock_widget)
 
     def load_config(self):
         if os.path.exists(self.config_path):
@@ -327,7 +341,9 @@ class MainWindow(QMainWindow):
 
     @Slot()
     def closeEvent(self, event):
-        if self.tray_icon.isVisible():
+        should_minimize = self.config.get("minimize_to_tray", True)
+
+        if should_minimize and self.tray_icon.isVisible():
             self.hide()
             self.tray_icon.showMessage(
                 "GNU Mau",
@@ -344,8 +360,8 @@ class MainWindow(QMainWindow):
     def changeEvent(self, event):
         if event.type() == QEvent.WindowStateChange and self.isMinimized():
             self.tray_icon.showMessage(
-                "Minimizado",
-                "La aplicación se ha minimizado a la bandeja del sistema",
+                "Minimized to Tray",
+                "The application has been minimized to the system tray",
                 QSystemTrayIcon.Information,
                 2000
             )

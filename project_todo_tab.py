@@ -20,22 +20,23 @@ class ProjectTodoTab(QWidget):
 
     def init_ui(self):
         self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(5, 5, 5, 5)
+        self.main_layout.setContentsMargins(15, 15, 15, 15)
+        self.main_layout.setSpacing(20)
 
-        # --- Panel Izquierdo ---
         self.left_panel = QWidget()
         self.left_panel_layout = QVBoxLayout(self.left_panel)
         self.left_panel_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_panel_layout.setSpacing(5)
 
         self.todo_list_widget = QListWidget()
         self.todo_list_widget.setDragDropMode(QAbstractItemView.InternalMove)
         self.todo_list_widget.itemClicked.connect(self.select_todo_item)
         
-        self.add_button = QPushButton("➕ New note")
+        self.add_button = QPushButton("➕ New TODO")
         self.add_button.clicked.connect(self.create_new_todo)
         
         # Botón Eliminar (Nuevo)
-        self.delete_button = QPushButton("🗑️ Delete note")
+        self.delete_button = QPushButton("🗑️ Delete TODO")
         self.delete_button.setStyleSheet("color: #ff4d4d;") # Opcional: rojo para advertir
         self.delete_button.clicked.connect(self.delete_current_todo)
 
@@ -72,28 +73,25 @@ class ProjectTodoTab(QWidget):
         self.save_timer.setSingleShot(True)
         self.save_timer.timeout.connect(self.save_current_todo)
 
-    # --- NUEVA FUNCIÓN: ELIMINAR NOTA ---
     def delete_current_todo(self):
         if not self.current_todo_id:
             return
 
         # Confirmación de usuario
         reply = QMessageBox.question(
-            self, 'Eliminar Nota',
-            "¿Estás seguro de que quieres eliminar esta nota?",
+            self, 'Remove TODO',
+            "Are you sure you want to remove this TODO?",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
 
         if reply == QMessageBox.Yes:
-            # Eliminar de la base de datos
             self.todos_collection.delete_one({"_id": ObjectId(self.current_todo_id)})
             
-            # Limpiar variables y editor
+            # Clean vars
             self.current_todo_id = None
             self.title_input.clear()
             self.text_editor.clear()
             
-            # Recargar la lista visual
             self.load_todos()
 
     def load_todos(self):
@@ -119,7 +117,7 @@ class ProjectTodoTab(QWidget):
     def create_new_todo(self):
         self.save_current_todo()
         new_todo = {
-            "title": "New note",
+            "title": "New TODO",
             "content": "☐ My first task",
             "project_id": str(self.project_id)
         }

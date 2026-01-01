@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QFileDialog, QTextEdit)
-from PySide6.QtCore import Slot, QTimer
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
+                               QFileDialog, QTextEdit, QGroupBox, QCheckBox)
+from PySide6.QtCore import Slot, QTimer, Qt
 from pacmanprogress import Pacman
 from backup_restore_threads import BackupThread, LoadThread
 import os
@@ -11,21 +12,42 @@ class SettingTab(QWidget):
         super().__init__()
         self.main_window = main_window
         self.info_layout = QVBoxLayout()
-        
-        # Layout horizontal para el botón y la etiqueta
         self.theme_layout = QHBoxLayout()
         
-        # Botón para cambiar el tema
         self.theme_button = QPushButton("Change Theme")
         self.theme_button.clicked.connect(self.toggle_theme)
         self.theme_layout.addWidget(self.theme_button)
 
-        # Etiqueta para indicar el estado del tema
         self.theme_label = QLabel("Light Theme")
         self.theme_layout.addWidget(self.theme_label)
+        self.tray_checkbox = QCheckBox("Minimize to tray when closing")
+        self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
+        self.info_layout.addWidget(self.tray_checkbox)
         
-        # Añadir el layout horizontal al layout principal
         self.info_layout.addLayout(self.theme_layout)
+
+        sidebar_group = QGroupBox("Sidebar position")
+        sidebar_layout = QHBoxLayout()
+
+        # Definimos las posiciones usando las constantes de Qt
+        # Qt.LeftDockWidgetArea = 0x1 (1)
+        # Qt.RightDockWidgetArea = 0x2 (2)
+        # Qt.TopDockWidgetArea = 0x4 (4)
+        # Qt.BottomDockWidgetArea = 0x8 (8)
+        positions = [
+            ("Left", Qt.LeftDockWidgetArea),
+            ("Right", Qt.RightDockWidgetArea),
+            ("Top", Qt.TopDockWidgetArea),
+            ("Bottom", Qt.BottomDockWidgetArea)
+        ]
+
+        for text, pos_enum in positions:
+            btn = QPushButton(text)
+            btn.clicked.connect(lambda checked=False, p=pos_enum: self.change_sidebar_pos(p))
+            sidebar_layout.addWidget(btn)
+
+        sidebar_group.setLayout(sidebar_layout)
+        self.info_layout.addWidget(sidebar_group)
 
         # Botones para respaldar y cargar la base de datos
         self.backup_button = QPushButton("Respaldo DB")
@@ -52,31 +74,28 @@ class SettingTab(QWidget):
 
         self.setLayout(self.info_layout)
 
-        # Cargar el tema desde el archivo de configuración
+        # Load config from JSON file
         config = self.load_config()
         self.dark_mode = config.get("dark_mode", False)
 
-        # Aplicar el estado correcto directamente (sin activar toggle_theme)
+        tray_setting = config.get("minimize_to_tray", True)
+        self.tray_checkbox.setChecked(tray_setting)
         if self.dark_mode:
             qss_file = self.get_qss_path()
-            with open(qss_file, "r") as file:
-                self.main_window.setStyleSheet(file.read())
-            self.theme_label.setText("Dark Theme")
+            try:
+                with open(qss_file, "r") as file:
+                    self.main_window.setStyleSheet(file.read())
+                self.theme_label.setText("Dark Theme")
+            except FileNotFoundError:
+                pass 
         else:
             self.main_window.setStyleSheet("")
             self.theme_label.setText("Light Theme")
-
-
 
     def get_config_path(self):
         config_dir = os.path.join(os.path.expanduser("~"), ".myapp")
         os.makedirs(config_dir, exist_ok=True)
         return os.path.join(config_dir, "config.json")
-
-    # def save_config(self, config_data):
-    #     config_path = self.get_config_path()
-    #     with open(config_path, "w") as config_file:
-    #         json.dump(config_data, config_file)
 
     def save_config(self, updated_data):
         config_path = self.get_config_path()
@@ -92,7 +111,6 @@ class SettingTab(QWidget):
 
         with open(config_path, "w") as f:
             json.dump(config, f, indent=4)
-
 
     def load_config(self):
         config_path = self.get_config_path()
@@ -110,24 +128,6 @@ class SettingTab(QWidget):
             base_path = os.path.dirname(__file__)
         return os.path.join(base_path, "dark_theme.qss")
 
-    # @Slot()
-    # def toggle_theme(self):
-    #     if self.dark_mode:
-    #         # Cambiar a tema claro
-    #         self.main_window.setStyleSheet("")
-    #         self.theme_label.setText("Light Theme")
-    #         config = {"theme": "light"}
-    #     else:
-    #         # Cambiar a tema oscuro
-    #         qss_file = self.get_qss_path()
-    #         with open(qss_file, "r") as file:
-    #             self.main_window.setStyleSheet(file.read())
-    #         self.theme_label.setText("Dark Theme")
-    #         config = {"theme": "dark"}
-
-    #     self.save_config(config)
-    #     self.dark_mode = not self.dark_mode
-
     @Slot()
     def toggle_theme(self):
         config_update = {}
@@ -140,14 +140,24 @@ class SettingTab(QWidget):
         else:
             # Cambiar a tema oscuro
             qss_file = self.get_qss_path()
-            with open(qss_file, "r") as file:
-                self.main_window.setStyleSheet(file.read())
-            self.theme_label.setText("Dark Theme")
-            config_update = {"dark_mode": True}
+            try:
+                with open(qss_file, "r") as file:
+                    self.main_window.setStyleSheet(file.read())
+                self.theme_label.setText("Dark Theme")
+                config_update = {"dark_mode": True}
+            except FileNotFoundError:
+                self.status_text.append("Error: No se encontró dark_theme.qss")
+                return
 
         self.save_config(config_update)
         self.dark_mode = not self.dark_mode
 
+    @Slot(int)
+    def change_sidebar_pos(self, pos_enum):
+        """Call the function in Main to move the sidebar"""
+        if hasattr(self.main_window, 'move_sidebar'):
+            self.main_window.move_sidebar(pos_enum)
+            self.status_text.append("Sidebar position updated.")
 
     @Slot()
     def backup_db(self):
@@ -213,3 +223,11 @@ class SettingTab(QWidget):
     def on_load_finished(self):
         self.status_text.append("Carga completada.")
         self.timer.stop()
+
+    @Slot(bool)
+    def toggle_tray_behavior(self, checked):
+        self.save_config({"minimize_to_tray": checked})
+        
+        if hasattr(self.main_window, 'config'):
+            self.main_window.config["minimize_to_tray"] = checked
+        self.status_text.append(f"Minimize to tray: {'Enabled' if checked else 'Disabled'}")

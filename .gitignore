@@ -1,6 +1,8 @@
-.__pycache__
 .env
-.dist
-.mongita_data
-./Notes/*
-.storage
+dist/
+__pycache__/*
+mongita_data/*
+storage/
+build/*
+notes/
+plugins/
