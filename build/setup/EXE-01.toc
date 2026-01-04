@@ -81,7 +81,7 @@
  [],
  False,
  False,
- 1767297861,
+ 1767373373,
  [('runw.exe',
    'C:\\Users\\remli\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\gnu-mau-QrNkpWJQ-py3.11\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],
