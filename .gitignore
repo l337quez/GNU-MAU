@@ -3,6 +3,7 @@ dist/
 __pycache__/*
 mongita_data/*
 storage/
+build
 build/*
 notes/
 plugins/

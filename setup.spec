@@ -13,6 +13,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(base_path, 'assets'), 'assets'),
+        (os.path.join(base_path, 'dark_theme.qss'), '.'),
     ],
     hiddenimports=[
         'PySide6.QtXml', 
@@ -36,6 +37,7 @@ exe = EXE(
     a.zipfiles,    
     a.datas,
     a.scripts,
+    Tree(os.path.join(base_path, 'assets', 'project_images'), prefix='project_images'),
     [],
     exclude_binaries=True,
     name='GNU Mau',
