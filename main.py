@@ -232,7 +232,6 @@ class MainWindow(QMainWindow):
             project_id = str(project["_id"]) 
             item.setData(Qt.UserRole, project_id) 
 
-            # --- CORRECCIÓN 1: Cargar la ruta real de la DB al iniciar ---
             icon_path = project.get('icon_path', "assets/project_images/default_icon.png")
             item.setData(Qt.UserRole + 1, icon_path) 
 
@@ -304,7 +303,8 @@ class MainWindow(QMainWindow):
             icon = QIcon(icon_path)
         self.current_project_item.setIcon(icon)
 
-        self.project_todo_tab.project_id = self.current_project_id
+        #self.project_todo_tab.project_id = self.current_project_id
+        self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_note_tab.set_project_id(self.current_project_id)
 

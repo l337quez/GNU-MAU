@@ -3,9 +3,43 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxL
 from PySide6.QtCore import Slot, QTimer, Qt
 from pacmanprogress import Pacman
 from backup_restore_threads import BackupThread, LoadThread
-import os
-import json
-import sys
+import os, json, sys
+import urllib.request
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtCore import QThread, Signal
+
+
+REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
+
+class UpdateCheckThread(QThread):
+    update_available = Signal(bool, str, str) 
+    error_occurred = Signal(str)
+
+    def __init__(self, local_version_path):
+        super().__init__()
+        self.local_path = local_version_path
+
+    def run(self):
+        local_ver = "0.0.0"
+        if os.path.exists(self.local_path):
+            try:
+                with open(self.local_path, 'r') as f:
+                    local_ver = f.read().strip()
+            except: pass
+        
+        try:
+            with urllib.request.urlopen(REPO_VERSION_URL, timeout=5) as response:
+                remote_ver = response.read().decode('utf-8').strip()
+        except Exception as e:
+            self.error_occurred.emit(f"Error de conexión: {e}")
+            return
+
+        def parse(v): return tuple(map(int, (v.split('.') if '.' in v else [0])))
+        
+        if parse(remote_ver) > parse(local_ver):
+            self.update_available.emit(True, local_ver, remote_ver)
+        else:
+            self.update_available.emit(False, local_ver, remote_ver)
 
 class SettingTab(QWidget):
     def __init__(self, main_window):
@@ -62,6 +96,11 @@ class SettingTab(QWidget):
         self.animate_button = QPushButton("Iniciar Animación")
         self.animate_button.clicked.connect(self.start_animation)
         self.info_layout.addWidget(self.animate_button)
+
+        # --- Botón de Actualizar ---
+        self.check_update_btn = QPushButton("Find Updates")
+        self.check_update_btn.clicked.connect(self.check_updates)
+        self.info_layout.addWidget(self.check_update_btn)
 
         # QLabel para la barra de progreso
         self.progress_label = QLabel("")
@@ -231,3 +270,38 @@ class SettingTab(QWidget):
         if hasattr(self.main_window, 'config'):
             self.main_window.config["minimize_to_tray"] = checked
         self.status_text.append(f"Minimize to tray: {'Enabled' if checked else 'Disabled'}")
+
+
+    def check_updates(self):
+        """Inicia la búsqueda de actualizaciones"""
+        self.status_text.append("Buscando actualizaciones...")
+        self.check_update_btn.setEnabled(False)
+
+        # Buscar version.txt en la misma carpeta del ejecutable/script
+        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+        if not os.path.exists(os.path.join(base_path, "version.txt")):
+             base_path = os.path.dirname(__file__) # Intento secundario
+        
+        version_path = os.path.join(base_path, "version.txt")
+
+        self.update_thread = UpdateCheckThread(version_path)
+        self.update_thread.update_available.connect(self.on_update_result)
+        self.update_thread.error_occurred.connect(self.on_update_error)
+        self.update_thread.finished.connect(lambda: self.check_update_btn.setEnabled(True))
+        self.update_thread.start()
+
+    @Slot(bool, str, str)
+    def on_update_result(self, is_available, local, remote):
+        if is_available:
+            msg = f"¡Versión {remote} disponible! (Actual: {local})\n¿Ir a descargar?"
+            if QMessageBox.question(self, "Update", msg) == QMessageBox.Yes:
+                import webbrowser
+                webbrowser.open("https://github.com/l337quez/GNU-MAU")
+        else:
+            QMessageBox.information(self, "Update", f"You're up to date ({local}).")
+            self.status_text.append("Updated system.")
+
+    @Slot(str)
+    def on_update_error(self, error_msg):
+        self.status_text.append(error_msg)
+        QMessageBox.warning(self, "Error", error_msg)

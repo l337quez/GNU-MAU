@@ -37,3 +37,8 @@
 
 #### ⟳ Changelog Alpha version 0.0.7 (2026-11-01)
 - Fixed a bug related with the dark theme loading at startup.
+
+#### ⟳ Changelog Beta version 0.1.8 (2026-15-01)
+- Added an emoji picker dialog to insert emojis into TODO items.
+- Added a "Clean Format" button to the toolbar to remove background colors and unusual styles from the text editor.
+- Added find updates button in settings tab to check for application updates.

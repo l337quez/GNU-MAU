@@ -6,7 +6,7 @@ from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QTextCursor
 from bson.objectid import ObjectId
 from todo_text_editor import TodoTextEditor
-
+from emoji_picker import EmojiPicker
 class ProjectTodoTab(QWidget):
     def __init__(self, main_window, project_id):
         super().__init__()
@@ -56,6 +56,19 @@ class ProjectTodoTab(QWidget):
         self.checkbox_button = QPushButton("☐ Insert task")
         self.checkbox_button.clicked.connect(self.insert_checkbox_at_cursor)
         self.toolbar_layout.addWidget(self.checkbox_button)
+
+        self.emoji_button = QPushButton("😊")
+        self.emoji_button.setFixedWidth(40) 
+        self.emoji_button.clicked.connect(self.open_emoji_picker)
+        self.toolbar_layout.addWidget(self.emoji_button)
+
+        self.clean_button = QPushButton("🧹 Clean Format")
+        self.clean_button.setToolTip("Elimina colores de fondo y estilos raros")
+        self.clean_button.clicked.connect(self.clean_text_format)
+        self.toolbar_layout.addWidget(self.clean_button)
+        
+        self.toolbar_layout.addStretch()
+
         self.toolbar_layout.addStretch()
 
         self.text_editor = TodoTextEditor()
@@ -181,3 +194,32 @@ class ProjectTodoTab(QWidget):
         self.project_id = new_project_id
         self.current_todo_id = None 
         self.load_todos()
+    
+    def open_emoji_picker(self):
+        dialog = EmojiPicker(self)
+        
+        if dialog.exec(): 
+            if dialog.selected_emoji:
+                cursor = self.text_editor.textCursor()
+                cursor.insertText(dialog.selected_emoji)
+                self.text_editor.setFocus()
+    
+    def clean_text_format(self):
+        """
+        Remove rich text formatting (background colors, fonts)
+        and leave only plain text.
+        """
+        cursor = self.text_editor.textCursor()
+        
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.Document)
+        
+        if cursor.hasSelection():
+            text_puro = cursor.selectedText().replace('\u2029', '\n')
+            
+            from PySide6.QtGui import QTextCharFormat
+            formato_limpio = QTextCharFormat() 
+            cursor.setCharFormat(formato_limpio)
+            cursor.insertText(text_puro)
+            self.text_editor.setFocus()
+            self.start_save_timer()
