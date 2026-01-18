@@ -1,3 +1,7 @@
+#### ⟳ Changelog Alpha version 0.0.2(2024-03-05)
+- Add support to gif images for project.
+- Fixed bug relates to saving information by project.
+
 #### ⟳ Changelog Alpha version 0.0.2(2024-14-09)
 - new todo section.
 - add new features relacted to copy, and delete in information section.
@@ -30,3 +34,11 @@
 - The default folder for selecting the project icon image has been changed.
 - A bug that caused the application to minimize to the system tray when minimized has been fixed; now it only minimizes to the system tray when the main window is closed.
 - when change icon for project the icon is not updated in the project list fixed.
+
+#### ⟳ Changelog Alpha version 0.0.7 (2026-11-01)
+- Fixed a bug related with the dark theme loading at startup.
+
+#### ⟳ Changelog Beta version 0.1.8 (2026-15-01)
+- Added an emoji picker dialog to insert emojis into TODO items.
+- Added a "Clean Format" button to the toolbar to remove background colors and unusual styles from the text editor.
+- Added find updates button in settings tab to check for application updates.

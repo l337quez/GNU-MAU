@@ -21,7 +21,7 @@ class AboutTab(QWidget):
         self.info_layout.addWidget(self.version_label)
 
         labels_data = [
-            ("version:", "v0.0.7 Alpha"),
+            ("version:", "v0.1.8 Beta"),
             ("license:", "GPL V3"),
             ("packaged:", "Ronal Forero"),
             ("translated:", "Ronal Forero"),
