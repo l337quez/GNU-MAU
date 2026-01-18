@@ -34,8 +34,10 @@ class UpdateCheckThread(QThread):
             self.error_occurred.emit(f"Error de conexión: {e}")
             return
 
-        def parse(v): return tuple(map(int, (v.split('.') if '.' in v else [0])))
-        
+        def parse(v): 
+            v = v.lower().replace('v', '').strip()
+            return tuple(map(int, (v.split('.') if '.' in v else [0])))
+
         if parse(remote_ver) > parse(local_ver):
             self.update_available.emit(True, local_ver, remote_ver)
         else:
