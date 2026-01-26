@@ -2,15 +2,12 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton,
                                QHBoxLayout, QLineEdit, QListWidget, 
                                QListWidgetItem, QMessageBox, QSplitter, 
                                QInputDialog, QStackedWidget)
-from PySide6.QtGui import QFont, QTextCursor
-from PySide6.QtCore import Slot, Qt
-import os
-import markdown2
-
-
+from PySide6.QtGui import (QFont, QTextCursor, Qt)
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import (Qt, Slot)
 
+import os, markdown2
+from utils import get_resource_path, clean_text_format
 from emoji_picker import  EmojiPicker
 
 class ProjectNoteTab(QWidget):
@@ -22,7 +19,6 @@ class ProjectNoteTab(QWidget):
         self.project_id = None
         self.notes_dir = ""
 
-        # --- NUEVO: CSS MEJORADO PARA TABLAS ---
         self.preview_css = """
         <style>
             body { font-family: 'Segoe UI', sans-serif; padding: 20px; line-height: 1.6; color: #333; }
@@ -50,7 +46,6 @@ class ProjectNoteTab(QWidget):
 
         self.main_layout = QVBoxLayout(self)
 
-        # --- EXPLORADOR ---
         self.explorer_group = QWidget()
         self.explorer_layout = QVBoxLayout(self.explorer_group)
         self.top_bar = QHBoxLayout()
@@ -71,12 +66,14 @@ class ProjectNoteTab(QWidget):
         self.editor_group = QWidget()
         self.editor_layout = QVBoxLayout(self.editor_group)
 
-        # Toolbar
+        # --- TOOLBAR --- 
         self.toolbar = QHBoxLayout()
         self.save_btn = QPushButton("💾 Save")
         self.save_btn.clicked.connect(self.save_current_note)
         
-        self.mode_btn = QPushButton("✏️ Edit")
+        self.mode_btn = QPushButton("✏️")
+        self.mode_btn.setToolTip("Edit")
+        self.mode_btn.setFixedWidth(35)
         self.mode_btn.setCheckable(True)
         self.mode_btn.setChecked(True) 
         self.mode_btn.toggled.connect(self.toggle_mode)
@@ -84,10 +81,9 @@ class ProjectNoteTab(QWidget):
         self.toolbar.addWidget(self.save_btn)
         self.toolbar.addWidget(self.mode_btn)
         
-        # --- NUEVOS BOTONES DE FORMATO ---
-        self.toolbar.addSpacing(15)
         
         self.emoji_btn = QPushButton("😊")
+        self.clean_button = QPushButton("🧹")
         self.bold_btn = QPushButton("B")
         self.italic_btn = QPushButton("I")
         self.header_btn = QPushButton("H1")     
@@ -96,20 +92,22 @@ class ProjectNoteTab(QWidget):
         self.quote_btn = QPushButton("❞")
         self.code_btn = QPushButton("<>")
         
-        # Lista de todos los botones de formato para controlarlos fácil
+        self.clean_button.setToolTip("Clean Format")
+
         self.format_btns = [
-            self.emoji_btn, self.bold_btn, self.italic_btn, self.header_btn, 
+            self.emoji_btn,  self.clean_button, self.bold_btn, self.italic_btn, self.header_btn, 
             self.list_btn, self.link_btn, self.quote_btn, self.code_btn,
             self.code_btn
         ]
 
         for btn in self.format_btns: 
-            btn.setFixedWidth(35) # Un poco más anchos para que quepan iconos
+            btn.setFixedWidth(35) 
             if btn == self.list_btn: btn.setFixedWidth(40)
             btn.setEnabled(False) 
 
-        # Agregar botones al layout
+        # add buttons to toolbar
         self.toolbar.addWidget(self.emoji_btn)
+        self.toolbar.addWidget(self.clean_button)
         self.toolbar.addWidget(self.header_btn)
         self.toolbar.addWidget(self.bold_btn)
         self.toolbar.addWidget(self.italic_btn)
@@ -141,8 +139,10 @@ class ProjectNoteTab(QWidget):
         self.splitter.setSizes([150, 400])
         self.main_layout.addWidget(self.splitter)
         
-        # Conexiones
+        # Connections
         self.new_note_btn.clicked.connect(self.create_new_note)
+        # self.clean_button.clicked.connect(clean_text_format)
+        self.clean_button.clicked.connect(lambda: clean_text_format(self.edit_area, self.save_current_note))
         self.search_input.textChanged.connect(self.filter_notes)
         
         # Lógica de inserción
@@ -151,16 +151,14 @@ class ProjectNoteTab(QWidget):
         self.quote_btn.clicked.connect(lambda: self.insert_md("> ", ""))
         self.code_btn.clicked.connect(lambda: self.insert_md("```\n", "\n```"))
         
-        # --- NUEVAS CONEXIONES ---
+
         self.header_btn.clicked.connect(lambda: self.insert_md("# ", ""))
         self.list_btn.clicked.connect(lambda: self.insert_md("- ", ""))
-        self.link_btn.clicked.connect(lambda: self.insert_md("[", "](url)")) # Inserta formato link
+        self.link_btn.clicked.connect(lambda: self.insert_md("[", "](url)")) 
 
-        # Conectamos el botón a la nueva función
         self.emoji_btn.clicked.connect(self.open_emoji_picker)
         self.setEnabled(False)
 
-    # ... (set_project_id y load_notes_from_dir son iguales) ...
     def set_project_id(self, project_id):
         self.project_id = str(project_id)
         self.notes_list_widget.clear()
@@ -186,26 +184,27 @@ class ProjectNoteTab(QWidget):
                 item.setData(Qt.UserRole, os.path.join(self.notes_dir, f))
                 self.notes_list_widget.addItem(item)
 
-    # --- FUNCIÓN AUXILIAR PARA RENDERIZAR MARKDOWN ---
     def render_markdown(self):
         raw_text = self.edit_area.toPlainText()
-        # NUEVO: Agregamos "tables" a los extras
         html = markdown2.markdown(raw_text, extras=["fenced-code-blocks", "blockquote", "tables"])
         self.view_area.setHtml(self.preview_css + html)
 
     @Slot(bool)
     def toggle_mode(self, checked):
         if checked:
-            self.mode_btn.setText("✏️ Edit")
-            self.render_markdown() # Usamos la función auxiliar
+            self.mode_btn.setText("✏️")
+            self.mode_btn.setToolTip("Edit")
+            self.mode_btn.setFixedWidth(35)
+        
+            self.render_markdown() 
             self.stack.setCurrentIndex(1)
-            # Deshabilitar todos los botones de formato
             for btn in self.format_btns:
                 btn.setEnabled(False)
         else:
-            self.mode_btn.setText("👁️ Preview")
+            self.mode_btn.setText("👁️")
+            self.mode_btn.setToolTip("Preview")
+            self.mode_btn.setFixedWidth(35)
             self.stack.setCurrentIndex(0)
-            # Habilitar todos los botones de formato
             for btn in self.format_btns:
                 btn.setEnabled(True)
             self.edit_area.setFocus()
@@ -238,7 +237,6 @@ class ProjectNoteTab(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not save: {e}")
 
-    # ... (insert_md, create_new_note y filter_notes son iguales) ...
     def insert_md(self, prefix, suffix):
         if self.stack.currentIndex() != 0: return 
         cursor = self.edit_area.textCursor()
@@ -247,8 +245,6 @@ class ProjectNoteTab(QWidget):
             cursor.insertText(f"{prefix}{text}{suffix}")
         else:
             cursor.insertText(f"{prefix}{suffix}")
-            # Si hay sufijo (como en link), movemos el cursor al medio
-            # Si no hay sufijo (como en lista), se queda al final
             if suffix: 
                 cursor.movePosition(QTextCursor.Left, QTextCursor.MoveAnchor, len(suffix))
         self.edit_area.setFocus()
@@ -276,8 +272,6 @@ class ProjectNoteTab(QWidget):
             if self.stack.currentIndex() != 0: return
 
             dialog = EmojiPicker(self)
-            # .exec() detiene el programa hasta que se cierra la ventana
             if dialog.exec(): 
                 if dialog.selected_emoji:
-                    # Insertamos el emoji seleccionado
                     self.insert_md(dialog.selected_emoji, "")

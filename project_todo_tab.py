@@ -1,12 +1,16 @@
+# Pyside imports
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLineEdit, QAbstractItemView, QMessageBox
 )
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QTextCursor, QTextCharFormat, QFont
+# Other imports
 from bson.objectid import ObjectId
+# MAU imports
 from todo_text_editor import TodoTextEditor
 from emoji_picker import EmojiPicker
+
 class ProjectTodoTab(QWidget):
     def __init__(self, main_window, project_id):
         super().__init__()
@@ -58,14 +62,20 @@ class ProjectTodoTab(QWidget):
         self.toolbar_layout.addWidget(self.checkbox_button)
 
         self.emoji_button = QPushButton("😊")
-        self.emoji_button.setFixedWidth(40) 
+        self.emoji_button.setFixedWidth(35) 
         self.emoji_button.clicked.connect(self.open_emoji_picker)
         self.toolbar_layout.addWidget(self.emoji_button)
 
-        self.clean_button = QPushButton("🧹 Clean Format")
-        self.clean_button.setToolTip("Elimina colores de fondo y estilos raros")
+        self.clean_button = QPushButton("🧹")
+        self.clean_button.setFixedWidth(35) 
+        self.clean_button.setToolTip("Clean Format")
         self.clean_button.clicked.connect(self.clean_text_format)
-        self.toolbar_layout.addWidget(self.clean_button)
+
+        self.bold_btn = QPushButton("B")
+        self.bold_btn.setFixedWidth(35)
+        self.bold_btn.clicked.connect(self.toggle_bold) 
+        self.toolbar_layout.addWidget(self.bold_btn)
+
         
         self.toolbar_layout.addStretch()
 
@@ -153,7 +163,8 @@ class ProjectTodoTab(QWidget):
             self.title_input.blockSignals(True)
             self.text_editor.blockSignals(True)
             self.title_input.setText(data.get("title", ""))
-            self.text_editor.setPlainText(data.get("content", ""))
+            # self.text_editor.setPlainText(data.get("content", ""))
+            self.text_editor.setMarkdown(data.get("content", ""))
             self.title_input.blockSignals(False)
             self.text_editor.blockSignals(False)
 
@@ -174,8 +185,10 @@ class ProjectTodoTab(QWidget):
             
             title = self.title_input.text()
             # toPlainText() captura todos los caracteres Unicode (incluyendo ☐ y ☑)
-            content = self.text_editor.toPlainText()
+            #content = self.text_editor.toPlainText()
+            content = self.text_editor.toMarkdown()
             
+
             self.todos_collection.update_one(
                 {"_id": ObjectId(self.current_todo_id)},
                 {"$set": {
@@ -223,3 +236,20 @@ class ProjectTodoTab(QWidget):
             cursor.insertText(text_puro)
             self.text_editor.setFocus()
             self.start_save_timer()
+
+    def toggle_bold(self):
+        cursor = self.text_editor.textCursor()
+        
+        if not cursor.hasSelection():
+            fmt = self.text_editor.currentCharFormat()
+            new_weight = QFont.Bold if fmt.fontWeight() != QFont.Bold else QFont.Normal
+            fmt.setFontWeight(new_weight)
+            self.text_editor.setCurrentCharFormat(fmt)
+        else:
+            fmt = cursor.charFormat()
+            new_fmt = QTextCharFormat()
+            new_fmt.setFontWeight(QFont.Bold if fmt.fontWeight() != QFont.Bold else QFont.Normal)
+            cursor.mergeCharFormat(new_fmt)
+        
+        self.text_editor.setFocus()
+        self.start_save_timer()

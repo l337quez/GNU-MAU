@@ -1,13 +1,13 @@
+# pyside imports
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
                                QFileDialog, QTextEdit, QGroupBox, QCheckBox)
 from PySide6.QtCore import Slot, QTimer, Qt
 from pacmanprogress import Pacman
-from backup_restore_threads import BackupThread, LoadThread
-import os, json, sys
-import urllib.request
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QThread, Signal
-
+# Other imports
+import os, json, sys, shutil
+import urllib.request
 
 REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
 
@@ -85,22 +85,25 @@ class SettingTab(QWidget):
         sidebar_group.setLayout(sidebar_layout)
         self.info_layout.addWidget(sidebar_group)
 
-        # Botones para respaldar y cargar la base de datos
-        self.backup_button = QPushButton("Respaldo DB")
-        self.backup_button.clicked.connect(self.backup_db)
-        self.info_layout.addWidget(self.backup_button)
+        db_group = QGroupBox("Restore Database")
+        db_group_layout = QHBoxLayout() 
 
-        self.load_button = QPushButton("Cargar DB")
-        self.load_button.clicked.connect(self.load_db)
-        self.info_layout.addWidget(self.load_button)
+        self.load_config_db_btn = QPushButton("Load config and apply changes")
+        self.load_config_db_btn.setFixedWidth(200) 
+        self.load_config_db_btn.clicked.connect(self.copy_files)
+        db_group_layout.addWidget(self.load_config_db_btn)
+        db_group_layout.addStretch()
 
-        # Botón para iniciar la animación de la barra de progreso
-        self.animate_button = QPushButton("Iniciar Animación")
+        db_group.setLayout(db_group_layout)
+        self.info_layout.addWidget(db_group)
+
+        self.animate_button = QPushButton("Animation Start")
+        self.animate_button.setFixedWidth(140) 
         self.animate_button.clicked.connect(self.start_animation)
         self.info_layout.addWidget(self.animate_button)
 
-        # --- Botón de Actualizar ---
         self.check_update_btn = QPushButton("Find Updates")
+        self.check_update_btn.setFixedWidth(140) 
         self.check_update_btn.clicked.connect(self.check_updates)
         self.info_layout.addWidget(self.check_update_btn)
 
@@ -200,47 +203,155 @@ class SettingTab(QWidget):
             self.main_window.move_sidebar(pos_enum)
             self.status_text.append("Sidebar position updated.")
 
+
+
     @Slot()
-    def backup_db(self):
-        file_dialog = QFileDialog()
-        file_path = QFileDialog.getExistingDirectory(self, "Guardar Respaldo de DB")
+    def copy_files(self):
+        """
+        Copy storage and mongita_data using an external process 
+        to bypass Windows file locking.
+        """
+        source_dir = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta _internal de origen")
         
-        if file_path:
-            self.backup_thread = BackupThread(self.main_window.db_name, file_path)
-            self.backup_thread.status_signal.connect(self.status_text.append)
-            self.backup_thread.finished_signal.connect(self.on_backup_finished)
-            self.status_text.clear()
-            self.status_text.append("Iniciando respaldo...\n")
+        if not source_dir:
+            return
 
-            # Iniciar el hilo de respaldo
-            self.backup_thread.start()
+        if os.path.basename(source_dir) != "_internal":
+            QMessageBox.warning(self, "Incorrect folder", 
+                                "You must specifically select the folder named '_internal'.")
+            return
 
-            # Iniciar la barra de progreso Pacman
-            self.pacman = Pacman(self.progress_label, start=0, end=100, width=35, text="Respaldo DB", candy_count=35)
-            self.timer = QTimer(self)
-            self.timer.timeout.connect(self.update_pacman)
-            self.timer.start(100)
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+            exe_path = sys.executable
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            exe_path = sys.argv[0]
 
-    @Slot()
-    def load_db(self):
-        file_dialog = QFileDialog()
-        file_path = QFileDialog.getExistingDirectory(self, "Cargar Respaldo de DB")
+        dest_internal = os.path.join(base_path, "_internal")
 
-        if file_path:
-            self.load_thread = LoadThread(self.main_window.db_name, file_path)
-            self.load_thread.status_signal.connect(self.status_text.append)
-            self.load_thread.finished_signal.connect(self.on_load_finished)
-            self.status_text.clear()
-            self.status_text.append("Iniciando carga...\n")
+        # 1. Crear el script de reemplazo (Batch script)
+        # Este script esperará a que el programa se cierre, borrará y copiará.
+        batch_path = os.path.join(base_path, "update_data.bat")
+        
+        storage_src = os.path.join(source_dir, "storage")
+        storage_dest = os.path.join(dest_internal, "storage")
+        mongita_src = os.path.join(source_dir, "mongita_data")
+        mongita_dest = os.path.join(dest_internal, "mongita_data")
 
-            # Iniciar el hilo de carga
-            self.load_thread.start()
+        # Script compatible with Windows cmd
+        batch_content = f"""
+        @echo off
+        timeout /t 2 /nobreak > nul
+        if exist "{storage_dest}" rd /s /q "{storage_dest}"
+        if exist "{mongita_dest}" rd /s /q "{mongita_dest}"
+        if exist "{storage_src}" xcopy "{storage_src}" "{storage_dest}" /e /i /y
+        if exist "{mongita_src}" xcopy "{mongita_src}" "{mongita_dest}" /e /i /y
+        start "" "{exe_path}"
+        del "%~f0"
+        """
+        try:
+            with open(batch_path, "w") as f:
+                f.write(batch_content)
 
-            # Iniciar la barra de progreso Pacman
-            self.pacman = Pacman(self.progress_label, start=0, end=100, width=35, text="Cargar DB", candy_count=35)
-            self.timer = QTimer(self)
-            self.timer.timeout.connect(self.update_pacman)
-            self.timer.start(100)
+            self.status_text.append("Preparing update files...")
+            
+            QMessageBox.information(
+                self,
+                "Update Ready",
+                "The application will close to update the data and will restart automatically."
+            )
+
+            # 2. Ejecutar el script de forma independiente
+            import subprocess
+            subprocess.Popen([batch_path], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            
+            # 3. Cerrar la aplicación inmediatamente para liberar los archivos
+            sys.exit(0)
+
+        except Exception as e:
+            error_msg = f"Error in copy_files: {str(e)}"
+            self.status_text.append(error_msg)
+            QMessageBox.critical(self, "Error", f"Failed to prepare update: {e}")
+
+        """
+        Copy storage and mongita_data from selected _internal folder 
+        to the program's own _internal folder.
+        """
+        source_dir = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta _internal de origen")
+        
+        if not source_dir:
+            return
+
+        if os.path.basename(source_dir) != "_internal":
+            QMessageBox.warning(self, "Incorrect folder", 
+                                "You must specifically select the folder named '_internal'.")
+            return
+
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        dest_internal = os.path.join(base_path, "_internal")
+
+        if not os.path.exists(dest_internal):
+            self.status_text.append(f"Error: Destination folder not found: {dest_internal}")
+            QMessageBox.critical(self, "Destination Error", 
+                                 "The '_internal' folder was not found in the program directory.")
+            return
+
+        folders_to_copy = ["storage", "mongita_data"]
+
+        try:
+            # 1. Force Disconnect and release file handles
+            import gc
+            import time
+
+            if hasattr(self.main_window, 'db_client') and self.main_window.db_client:
+                self.main_window.db_client.close()
+                self.main_window.db_client = None
+            
+            if hasattr(self.main_window, 'db'):
+                self.main_window.db = None
+            
+            # Explicitly clear references and collect garbage
+            gc.collect()
+            time.sleep(1.0) 
+
+            self.status_text.append(f"Starting copy to: {dest_internal}")
+
+            for folder in folders_to_copy:
+                s = os.path.join(source_dir, folder)    
+                d = os.path.join(dest_internal, folder) 
+                
+                if os.path.exists(s):
+                    self.status_text.append(f"Copiando {folder}...")
+                    
+                    if os.path.exists(d):
+                        # Retry logic for rmtree
+                        for i in range(3):
+                            try:
+                                shutil.rmtree(d)
+                                break
+                            except OSError:
+                                if i == 2: raise
+                                time.sleep(1)
+
+                    shutil.copytree(s, d)
+                else:
+                    self.status_text.append(f"Warning: '{folder}' not found in source.")
+
+            self.status_text.append("Data copy completed!")
+            QMessageBox.information(self, "Success", "Data updated. The application will close to apply changes.")
+            
+            # Force exit to ensure no corrupted sessions
+            sys.exit(0)
+            
+        except Exception as e:
+            error_msg = f"Error in copy_files: {str(e)}"
+            self.status_text.append(error_msg)
+            QMessageBox.critical(self, "Error", f"Failed to copy files: {e}")
 
     @Slot()
     def start_animation(self):
