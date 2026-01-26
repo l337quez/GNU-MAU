@@ -42,3 +42,12 @@
 - Added an emoji picker dialog to insert emojis into TODO items.
 - Added a "Clean Format" button to the toolbar to remove background colors and unusual styles from the text editor.
 - Added find updates button in settings tab to check for application updates.
+
+#### ⟳ Changelog Beta version 0.1.8 (2026-24-01)
+- Added restore database mongita from backup file feature in settings tab.
+- Fixed a bug related to loading the correct project ID in the TODO tab when switching projects.
+- Add bold to the text in the notes tab when saving a note with bold formatting.
+- Fix buttons width in settings tab for better UI consistency.
+- Fix buttons in Notes tab
+- Fix: copy storage and mongita_data from selected _internal folder to the program's own _internal folder.
+
