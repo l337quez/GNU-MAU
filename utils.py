@@ -1,5 +1,5 @@
 import  sys, os
-from PySide6.QtGui import QTextCursor, QTextCharFormat 
+from PySide6.QtGui import QTextCursor, QTextCharFormat, QTextBlockFormat 
 
 def get_resource_path(relative_path):
     """
@@ -25,9 +25,12 @@ def clean_text_format(editor, on_after_clean=None):
     if cursor.hasSelection():
         text_puro = cursor.selectedText().replace('\u2029', '\n')
         
-        clean_format = QTextCharFormat() 
-        cursor.setCharFormat(clean_format)
-        cursor.insertText(text_puro)
+        clean_char_fmt = QTextCharFormat() 
+        clean_block_fmt = QTextBlockFormat()
+
+        cursor.setBlockFormat(clean_block_fmt)
+        cursor.setCharFormat(clean_char_fmt)
+        cursor.insertText(text_puro, clean_char_fmt)
         
         editor.setFocus()
         

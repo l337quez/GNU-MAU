@@ -10,6 +10,7 @@ from bson.objectid import ObjectId
 # MAU imports
 from todo_text_editor import TodoTextEditor
 from emoji_picker import EmojiPicker
+from utils import clean_text_format
 
 class ProjectTodoTab(QWidget):
     def __init__(self, main_window, project_id):
@@ -69,7 +70,10 @@ class ProjectTodoTab(QWidget):
         self.clean_button = QPushButton("🧹")
         self.clean_button.setFixedWidth(35) 
         self.clean_button.setToolTip("Clean Format")
-        self.clean_button.clicked.connect(self.clean_text_format)
+        # self.clean_button.clicked.connect(self.clean_text_format)
+        self.clean_button.clicked.connect(lambda: clean_text_format(self.text_editor, self.save_current_todo))
+        self.toolbar_layout.addWidget(self.clean_button)
+
 
         self.bold_btn = QPushButton("B")
         self.bold_btn.setFixedWidth(35)
@@ -217,25 +221,7 @@ class ProjectTodoTab(QWidget):
                 cursor.insertText(dialog.selected_emoji)
                 self.text_editor.setFocus()
     
-    def clean_text_format(self):
-        """
-        Remove rich text formatting (background colors, fonts)
-        and leave only plain text.
-        """
-        cursor = self.text_editor.textCursor()
-        
-        if not cursor.hasSelection():
-            cursor.select(QTextCursor.Document)
-        
-        if cursor.hasSelection():
-            text_puro = cursor.selectedText().replace('\u2029', '\n')
-            
-            from PySide6.QtGui import QTextCharFormat
-            formato_limpio = QTextCharFormat() 
-            cursor.setCharFormat(formato_limpio)
-            cursor.insertText(text_puro)
-            self.text_editor.setFocus()
-            self.start_save_timer()
+
 
     def toggle_bold(self):
         cursor = self.text_editor.textCursor()

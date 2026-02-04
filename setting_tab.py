@@ -88,7 +88,7 @@ class SettingTab(QWidget):
         db_group = QGroupBox("Restore Database")
         db_group_layout = QHBoxLayout() 
 
-        self.load_config_db_btn = QPushButton("Load config and apply changes")
+        self.load_config_db_btn = QPushButton("Restore data base and storage")
         self.load_config_db_btn.setFixedWidth(200) 
         self.load_config_db_btn.clicked.connect(self.copy_files)
         db_group_layout.addWidget(self.load_config_db_btn)
@@ -238,6 +238,8 @@ class SettingTab(QWidget):
         storage_dest = os.path.join(dest_internal, "storage")
         mongita_src = os.path.join(source_dir, "mongita_data")
         mongita_dest = os.path.join(dest_internal, "mongita_data")
+        version_src = os.path.join(source_dir, "version.txt")
+        version_dest = os.path.join(base_path, "version.txt")
 
         # Script compatible with Windows cmd
         batch_content = f"""
@@ -247,6 +249,7 @@ class SettingTab(QWidget):
         if exist "{mongita_dest}" rd /s /q "{mongita_dest}"
         if exist "{storage_src}" xcopy "{storage_src}" "{storage_dest}" /e /i /y
         if exist "{mongita_src}" xcopy "{mongita_src}" "{mongita_dest}" /e /i /y
+        if exist "{version_src}" copy /y "{version_src}" "{version_dest}"
         start "" "{exe_path}"
         del "%~f0"
         """
@@ -274,84 +277,7 @@ class SettingTab(QWidget):
             self.status_text.append(error_msg)
             QMessageBox.critical(self, "Error", f"Failed to prepare update: {e}")
 
-        """
-        Copy storage and mongita_data from selected _internal folder 
-        to the program's own _internal folder.
-        """
-        source_dir = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta _internal de origen")
         
-        if not source_dir:
-            return
-
-        if os.path.basename(source_dir) != "_internal":
-            QMessageBox.warning(self, "Incorrect folder", 
-                                "You must specifically select the folder named '_internal'.")
-            return
-
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
-        dest_internal = os.path.join(base_path, "_internal")
-
-        if not os.path.exists(dest_internal):
-            self.status_text.append(f"Error: Destination folder not found: {dest_internal}")
-            QMessageBox.critical(self, "Destination Error", 
-                                 "The '_internal' folder was not found in the program directory.")
-            return
-
-        folders_to_copy = ["storage", "mongita_data"]
-
-        try:
-            # 1. Force Disconnect and release file handles
-            import gc
-            import time
-
-            if hasattr(self.main_window, 'db_client') and self.main_window.db_client:
-                self.main_window.db_client.close()
-                self.main_window.db_client = None
-            
-            if hasattr(self.main_window, 'db'):
-                self.main_window.db = None
-            
-            # Explicitly clear references and collect garbage
-            gc.collect()
-            time.sleep(1.0) 
-
-            self.status_text.append(f"Starting copy to: {dest_internal}")
-
-            for folder in folders_to_copy:
-                s = os.path.join(source_dir, folder)    
-                d = os.path.join(dest_internal, folder) 
-                
-                if os.path.exists(s):
-                    self.status_text.append(f"Copiando {folder}...")
-                    
-                    if os.path.exists(d):
-                        # Retry logic for rmtree
-                        for i in range(3):
-                            try:
-                                shutil.rmtree(d)
-                                break
-                            except OSError:
-                                if i == 2: raise
-                                time.sleep(1)
-
-                    shutil.copytree(s, d)
-                else:
-                    self.status_text.append(f"Warning: '{folder}' not found in source.")
-
-            self.status_text.append("Data copy completed!")
-            QMessageBox.information(self, "Success", "Data updated. The application will close to apply changes.")
-            
-            # Force exit to ensure no corrupted sessions
-            sys.exit(0)
-            
-        except Exception as e:
-            error_msg = f"Error in copy_files: {str(e)}"
-            self.status_text.append(error_msg)
-            QMessageBox.critical(self, "Error", f"Failed to copy files: {e}")
 
     @Slot()
     def start_animation(self):
@@ -386,11 +312,13 @@ class SettingTab(QWidget):
 
 
     def check_updates(self):
-        """Inicia la búsqueda de actualizaciones"""
-        self.status_text.append("Buscando actualizaciones...")
+        """
+        Start finding updates
+        """
+        self.status_text.append("Searching for updates...")
         self.check_update_btn.setEnabled(False)
 
-        # Buscar version.txt en la misma carpeta del ejecutable/script
+        # Search for version.txt in the same folder as the executable/script
         base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
         if not os.path.exists(os.path.join(base_path, "version.txt")):
              base_path = os.path.dirname(__file__) # Intento secundario
@@ -406,7 +334,7 @@ class SettingTab(QWidget):
     @Slot(bool, str, str)
     def on_update_result(self, is_available, local, remote):
         if is_available:
-            msg = f"¡Versión {remote} disponible! (Actual: {local})\n¿Ir a descargar?"
+            msg = f"¡Versión {remote}  disponible! (Actual: {local})\n¿Ir a descargar?"
             if QMessageBox.question(self, "Update", msg) == QMessageBox.Yes:
                 import webbrowser
                 webbrowser.open("https://github.com/l337quez/GNU-MAU")
