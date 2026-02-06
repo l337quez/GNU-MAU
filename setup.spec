@@ -13,7 +13,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(base_path, 'assets'), 'assets'),
-        (os.path.join(base_path, 'dark_theme.qss'), '.'),
+        (os.path.join(base_path, 'themes'), 'themes'),
     ],
     hiddenimports=[
         'PySide6.QtXml', 

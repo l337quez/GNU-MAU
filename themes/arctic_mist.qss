@@ -5,16 +5,19 @@ QWidget {
     font-size: 10pt;
 }
 
-/* --- BOTONES (Estilo Redondeado "Bonito") --- */
+
+
 QPushButton {
     background-color: #434C5E;
     color: #ECEFF4;
-    border: 1px solid #81A1C1; /* Borde azulado suave */
-    border-radius: 5px;        /* El redondeado que te gustó */
-    padding: 4px 8px;   /* Padding más equilibrado */
-    min-height: 22px;   /* Evita que el botón se colapse */
-    min-width: 22px;    /* Asegura espacio para iconos/emojis */
+    border: 1px solid #81A1C1;
+    border-radius: 4px;        /* Reducido un poco para que encaje mejor */
+    padding: 2px;              /* Reducimos el padding al mínimo para que no empuje el borde */
+    min-height: 18px;          /* Bajamos la altura mínima de 22px a 18px */
+    max-height: 22px;          /* Añadimos una altura máxima para que no crezca de más */
+    min-width: 24px;           /* Un poco más de ancho para que el icono respire */
 }
+
 
 QPushButton:hover {
     background-color: #4C566A;
@@ -91,14 +94,32 @@ QTabWidget::pane {
 
 QTableWidget {
     background-color: #3B4252;
+    alternate-background-color: #2E3440; /* Esto quita el blanco de las filas alternas */
     gridline-color: #4C566A;
     border: 1px solid #4C566A;
-    border-radius: 5px; /* Bordes suaves para la tabla también */
+    border-radius: 5px;
+    color: #ECEFF4; /* Asegura que el texto sea claro */
+}
+
+QTableWidget::item {
+    background-color: #3B4252;
+    color: #ECEFF4;
+}
+
+QTableWidget::item:selected {
+    background-color: #88C0D0;
+    color: #2E3440;
 }
 
 QHeaderView::section {
-    background-color: #434C5E;
-    color: #88C0D0;
+    background-color: #3B4252; /* Color oscuro igual a la tabla */
+    color: #88C0D0;            /* Color azul claro para el texto */
     padding: 5px;
     border: 1px solid #2E3440;
+    font-weight: bold;         /* Para que resalte más */
+}
+
+QHeaderView {
+    background-color: #3B4252;
+    border: none;
 }
