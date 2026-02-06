@@ -1,0 +1,104 @@
+/* --- ESTILO GENERAL --- */
+QWidget {
+    background-color: #2E3440;
+    color: #ECEFF4;
+    font-size: 10pt;
+}
+
+/* --- BOTONES (Estilo Redondeado "Bonito") --- */
+QPushButton {
+    background-color: #434C5E;
+    color: #ECEFF4;
+    border: 1px solid #81A1C1; /* Borde azulado suave */
+    border-radius: 5px;        /* El redondeado que te gustó */
+    padding: 4px 8px;   /* Padding más equilibrado */
+    min-height: 22px;   /* Evita que el botón se colapse */
+    min-width: 22px;    /* Asegura espacio para iconos/emojis */
+}
+
+QPushButton:hover {
+    background-color: #4C566A;
+    border: 1px solid #88C0D0; /* Brillo al pasar el mouse */
+}
+
+QPushButton:pressed {
+    background-color: #3B4252;
+    padding-left: 5px; 
+    padding-top: 5px;
+}
+
+/* --- QCOMBOBOX (Flecha Moderna) --- */
+QComboBox {
+    border: 1px solid #4C566A;
+    border-radius: 5px;
+    padding: 5px 30px 5px 10px;
+    background-color: #3B4252;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 25px;
+    border-left: 1px solid #4C566A;
+}
+
+QComboBox::down-arrow {
+    image: none; 
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #88C0D0; 
+    margin-top: 2px;
+}
+
+/* --- CAMPOS DE TEXTO (Redondeados) --- */
+QLineEdit {
+    background-color: #3B4252;
+    color: #ECEFF4;
+    border: 1px solid #4C566A;
+    border-radius: 5px; /* Consistente con los botones */
+    padding: 5px;
+}
+
+QLineEdit:focus {
+    border: 1px solid #88C0D0;
+}
+
+/* --- TABS (Pestañas) --- */
+QTabBar::tab {
+    background-color: #3B4252;
+    color: #D8DEE9;
+    padding: 8px 15px;
+    border: 1px solid #4C566A;
+    border-bottom: none;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #434C5E;
+    color: #88C0D0;
+    margin-bottom: -1px; 
+    border-top: 2px solid #88C0D0;
+}
+
+/* --- PANEL Y TABLAS --- */
+QTabWidget::pane {
+    border: 1px solid #4C566A;
+    top: -1px; 
+    background-color: #2E3440;
+}
+
+QTableWidget {
+    background-color: #3B4252;
+    gridline-color: #4C566A;
+    border: 1px solid #4C566A;
+    border-radius: 5px; /* Bordes suaves para la tabla también */
+}
+
+QHeaderView::section {
+    background-color: #434C5E;
+    color: #88C0D0;
+    padding: 5px;
+    border: 1px solid #2E3440;
+}

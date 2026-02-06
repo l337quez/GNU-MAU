@@ -1,8 +1,12 @@
+#### ⟳ Changelog Alpha version 0.0.1(2024-01-03)
+- start the project.
+- add first version of the application.
+
 #### ⟳ Changelog Alpha version 0.0.2(2024-03-05)
 - Add support to gif images for project.
 - Fixed bug relates to saving information by project.
 
-#### ⟳ Changelog Alpha version 0.0.2(2024-14-09)
+#### ⟳ Changelog Alpha version 0.0.2(2024-09-14)
 - new todo section.
 - add new features relacted to copy, and delete in information section.
 - save the theme in a configuration file
@@ -35,15 +39,15 @@
 - A bug that caused the application to minimize to the system tray when minimized has been fixed; now it only minimizes to the system tray when the main window is closed.
 - when change icon for project the icon is not updated in the project list fixed.
 
-#### ⟳ Changelog Alpha version 0.0.7 (2026-11-01)
+#### ⟳ Changelog Alpha version 0.0.7 (2026-01-11)
 - Fixed a bug related with the dark theme loading at startup.
 
-#### ⟳ Changelog Beta version 0.1.8 (2026-15-01)
+#### ⟳ Changelog Beta version 0.1.8 (2026-01-15)
 - Added an emoji picker dialog to insert emojis into TODO items.
 - Added a "Clean Format" button to the toolbar to remove background colors and unusual styles from the text editor.
 - Added find updates button in settings tab to check for application updates.
 
-#### ⟳ Changelog Beta version 0.1.8 (2026-24-01)
+#### ⟳ Changelog Beta version 0.1.8 (2026-02-24)
 - Added restore database mongita from backup file feature in settings tab.
 - Fixed a bug related to loading the correct project ID in the TODO tab when switching projects.
 - Add bold to the text in the notes tab when saving a note with bold formatting.
@@ -51,3 +55,6 @@
 - Fix buttons in Notes tab
 - Fix: copy storage and mongita_data from selected _internal folder to the program's own _internal folder.
 
+#### ⟳ Changelog Beta version 0.1.8 (2026-02-05)
+- Add new theme Arctic Mist.
+- Modify list theme.    

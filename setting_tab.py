@@ -1,6 +1,6 @@
 # pyside imports
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
-                               QFileDialog, QTextEdit, QGroupBox, QCheckBox)
+                               QFileDialog, QTextEdit, QGroupBox, QCheckBox, QComboBox)
 from PySide6.QtCore import Slot, QTimer, Qt
 from pacmanprogress import Pacman
 from PySide6.QtWidgets import QMessageBox
@@ -49,16 +49,10 @@ class SettingTab(QWidget):
         self.main_window = main_window
         self.info_layout = QVBoxLayout()
         self.theme_layout = QHBoxLayout()
-        
-        self.theme_button = QPushButton("Change Theme")
-        self.theme_button.clicked.connect(self.toggle_theme)
-        self.theme_layout.addWidget(self.theme_button)
-
-        self.theme_label = QLabel("Light Theme")
-        self.theme_layout.addWidget(self.theme_label)
-        self.tray_checkbox = QCheckBox("Minimize to tray when closing")
-        self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
-        self.info_layout.addWidget(self.tray_checkbox)
+        self.theme_layout.addWidget(QLabel("Theme:"))
+        self.theme_combo = QComboBox()
+        self.theme_layout.addWidget(self.theme_combo)
+        self.theme_combo.currentIndexChanged.connect(self.change_theme)
         
         self.info_layout.addLayout(self.theme_layout)
 
@@ -107,6 +101,11 @@ class SettingTab(QWidget):
         self.check_update_btn.clicked.connect(self.check_updates)
         self.info_layout.addWidget(self.check_update_btn)
 
+        # Tray checkbox
+        self.tray_checkbox = QCheckBox("Minimize to tray when closing")
+        self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
+        self.info_layout.addWidget(self.tray_checkbox)
+
         # QLabel para la barra de progreso
         self.progress_label = QLabel("")
         self.info_layout.addWidget(self.progress_label)
@@ -120,21 +119,19 @@ class SettingTab(QWidget):
 
         # Load config from JSON file
         config = self.load_config()
-        self.dark_mode = config.get("dark_mode", False)
+        self.current_theme = config.get("theme", "Light Theme")
 
         tray_setting = config.get("minimize_to_tray", True)
         self.tray_checkbox.setChecked(tray_setting)
-        if self.dark_mode:
-            qss_file = self.get_qss_path()
-            try:
-                with open(qss_file, "r") as file:
-                    self.main_window.setStyleSheet(file.read())
-                self.theme_label.setText("Dark Theme")
-            except FileNotFoundError:
-                pass 
-        else:
-            self.main_window.setStyleSheet("")
-            self.theme_label.setText("Light Theme")
+        
+        self.load_available_themes()
+        
+        # Set selection in combo box without triggering change_theme twice
+        index = self.theme_combo.findText(self.current_theme)
+        if index >= 0:
+            self.theme_combo.setCurrentIndex(index)
+        
+        self.apply_theme(self.current_theme)
 
     def get_config_path(self):
         config_dir = os.path.join(os.path.expanduser("~"), ".myapp")
@@ -163,38 +160,47 @@ class SettingTab(QWidget):
                 return json.load(config_file)
         return {}
 
-    def get_qss_path(self):
+    def get_qss_path(self, theme_name):
         if getattr(sys, 'frozen', False):
-            # Estamos empaquetados con PyInstaller
             base_path = sys._MEIPASS
         else:
-            # Estamos en modo de desarrollo
-            base_path = os.path.dirname(__file__)
-        return os.path.join(base_path, "dark_theme.qss")
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base_path, "themes", f"{theme_name}.qss")
 
-    @Slot()
-    def toggle_theme(self):
-        config_update = {}
-
-        if self.dark_mode:
-            # Cambiar a tema claro
-            self.main_window.setStyleSheet("")
-            self.theme_label.setText("Light Theme")
-            config_update = {"dark_mode": False}
+    def load_available_themes(self):
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.clear()
+        self.theme_combo.addItem("Light Theme")
+        
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
         else:
-            # Cambiar a tema oscuro
-            qss_file = self.get_qss_path()
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        
+        themes_dir = os.path.join(base_path, "themes")
+        if os.path.exists(themes_dir):
+            for file in os.listdir(themes_dir):
+                if file.endswith(".qss"):
+                    self.theme_combo.addItem(file.replace(".qss", ""))
+        self.theme_combo.blockSignals(False)
+
+    def apply_theme(self, theme_name):
+        if theme_name == "Light Theme":
+            self.main_window.setStyleSheet("")
+        else:
+            qss_file = self.get_qss_path(theme_name)
             try:
                 with open(qss_file, "r") as file:
                     self.main_window.setStyleSheet(file.read())
-                self.theme_label.setText("Dark Theme")
-                config_update = {"dark_mode": True}
             except FileNotFoundError:
-                self.status_text.append("Error: No se encontró dark_theme.qss")
-                return
+                self.status_text.append(f"Error: No se encontró {theme_name}.qss")
 
-        self.save_config(config_update)
-        self.dark_mode = not self.dark_mode
+    @Slot(int)
+    def change_theme(self, index):
+        theme_name = self.theme_combo.itemText(index)
+        self.apply_theme(theme_name)
+        self.save_config({"theme": theme_name})
+        self.current_theme = theme_name
 
     @Slot(int)
     def change_sidebar_pos(self, pos_enum):
@@ -230,8 +236,7 @@ class SettingTab(QWidget):
 
         dest_internal = os.path.join(base_path, "_internal")
 
-        # 1. Crear el script de reemplazo (Batch script)
-        # Este script esperará a que el programa se cierre, borrará y copiará.
+        # script bash, waiting for 2 seconds, then copy files
         batch_path = os.path.join(base_path, "update_data.bat")
         
         storage_src = os.path.join(source_dir, "storage")
@@ -265,11 +270,10 @@ class SettingTab(QWidget):
                 "The application will close to update the data and will restart automatically."
             )
 
-            # 2. Ejecutar el script de forma independiente
+            # Ejecutar el script de forma independiente
             import subprocess
             subprocess.Popen([batch_path], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
             
-            # 3. Cerrar la aplicación inmediatamente para liberar los archivos
             sys.exit(0)
 
         except Exception as e:
@@ -321,7 +325,7 @@ class SettingTab(QWidget):
         # Search for version.txt in the same folder as the executable/script
         base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
         if not os.path.exists(os.path.join(base_path, "version.txt")):
-             base_path = os.path.dirname(__file__) # Intento secundario
+             base_path = os.path.dirname(__file__) 
         
         version_path = os.path.join(base_path, "version.txt")
 

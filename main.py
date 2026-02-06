@@ -173,19 +173,30 @@ class MainWindow(QMainWindow):
         if os.path.exists(self.config_path):
             with open(self.config_path, 'r') as f:
                 self.config = json.load(f)
-            dark_mode = self.config.get("dark_mode", False)
-            self.apply_theme(dark_mode)
+            
+            # Use 'theme' key, fallback to 'dark_mode' for backward compatibility
+            theme = self.config.get("theme")
+            if theme is None:
+                dark_mode = self.config.get("dark_mode", False)
+                theme = "dark_theme" if dark_mode else "Light Theme"
+            
+            self.apply_theme(theme)
 
-    def apply_theme(self, dark_mode):
-        if dark_mode:
-            try:
-                with open("dark_theme.qss", "r") as f:
-                    dark_style_sheet = f.read()
-                self.setStyleSheet(dark_style_sheet)
-            except FileNotFoundError:
-                print("Tema oscuro no encontrado")
-        else:
+    def apply_theme(self, theme_name):
+        if theme_name == "Light Theme":
             self.setStyleSheet("")
+        else:
+            if getattr(sys, 'frozen', False):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.dirname(os.path.abspath(__file__))
+            
+            qss_file = os.path.join(base_path, "themes", f"{theme_name}.qss")
+            try:
+                with open(qss_file, "r") as f:
+                    self.setStyleSheet(f.read())
+            except FileNotFoundError:
+                print(f"Tema {theme_name} no encontrado en {qss_file}")
 
     def create_collections(self):
         if 'projects' not in self.db.list_collection_names():
