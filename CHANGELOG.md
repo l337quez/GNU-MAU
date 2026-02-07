@@ -58,3 +58,9 @@
 #### ⟳ Changelog Beta version 0.1.8 (2026-02-05)
 - Add new theme Arctic Mist.
 - Modify list theme.    
+
+#### ⟳ Changelog Beta version 0.1.8 (2026-02-07)
+- Add new theme Amber Dusk.
+- Modify list theme.    
+- Add button to open terminal in the project folder.
+- New version 0.1.9 (2026-02-07)

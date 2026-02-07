@@ -16,14 +16,14 @@ from project_tab import ProjectTab
 from project_info_tab import ProjectInfoTab
 from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
-from utils import get_resource_path
+from utils import get_resource_path, is_windows
 
 
 # load env file
 load_dotenv()
 
 # Establecer explícitamente el ID de modelo de usuario de aplicación en Windows
-if sys.platform.startswith('win'):
+if is_windows():
     import ctypes
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(u'CompanyName.ProductName.SubProduct.VersionInformation')
 

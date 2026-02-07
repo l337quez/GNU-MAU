@@ -8,6 +8,7 @@ from PySide6.QtCore import QThread, Signal
 # Other imports
 import os, json, sys, shutil
 import urllib.request
+from utils import is_windows
 
 REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
 
@@ -287,7 +288,12 @@ class SettingTab(QWidget):
 
             # Ejecutar el script de forma independiente
             import subprocess
-            subprocess.Popen([batch_path], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            popen_args = {"shell": True}
+            if is_windows():
+                # CREATE_NEW_CONSOLE is only available on Windows
+                popen_args["creationflags"] = 0x00000010 # subprocess.CREATE_NEW_CONSOLE
+            
+            subprocess.Popen([batch_path], **popen_args)
             
             sys.exit(0)
 
