@@ -83,14 +83,23 @@ class ProjectNoteTab(QWidget):
         
         
         self.emoji_btn = QPushButton("😊")
+        self.emoji_btn.setToolTip("Insert Emoji")
         self.clean_button = QPushButton("🧹")
+        self.clean_button.setToolTip("Clean Format")
         self.bold_btn = QPushButton("B")
+        self.bold_btn.setToolTip("Bold")
         self.italic_btn = QPushButton("I")
+        self.italic_btn.setToolTip("Italic")
         self.header_btn = QPushButton("H1")     
-        self.list_btn = QPushButton("List")     
-        self.link_btn = QPushButton("🔗")      
+        self.header_btn.setToolTip("Header")
+        self.list_btn = QPushButton("List")    
+        self.list_btn.setToolTip("Bullet List") 
+        self.link_btn = QPushButton("🔗")
+        self.link_btn.setToolTip("Insert Link")      
         self.quote_btn = QPushButton("❞")
+        self.quote_btn.setToolTip("Blockquote")
         self.code_btn = QPushButton("<>")
+        self.code_btn.setToolTip("Code Block")
         
         self.clean_button.setToolTip("Clean Format")
 
@@ -158,6 +167,17 @@ class ProjectNoteTab(QWidget):
 
         self.emoji_btn.clicked.connect(self.open_emoji_picker)
         self.setEnabled(False)
+    
+    def keyPressEvent(self, event):
+        """Handle Delete key press to delete selected note"""
+        if event.key() == Qt.Key_Delete:
+            # Check if notes list has focus and an item is selected
+            if self.notes_list_widget.hasFocus() and self.notes_list_widget.currentItem():
+                self.delete_selected_note()
+            else:
+                super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
 
     def set_project_id(self, project_id):
         self.project_id = str(project_id)
@@ -275,3 +295,40 @@ class ProjectNoteTab(QWidget):
             if dialog.exec(): 
                 if dialog.selected_emoji:
                     self.insert_md(dialog.selected_emoji, "")
+    
+    @Slot()
+    def delete_selected_note(self):
+        """Delete the currently selected note after confirmation"""
+        current_item = self.notes_list_widget.currentItem()
+        if not current_item:
+            return
+        
+        note_path = current_item.data(Qt.UserRole)
+        note_name = current_item.text().replace("📄 ", "")
+        
+        # Show confirmation dialog
+        reply = QMessageBox.question(
+            self, 
+            "Delete Note", 
+            f"Are you sure you want to delete '{note_name}'?\n\nThis action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Delete the file
+                if os.path.exists(note_path):
+                    os.remove(note_path)
+                
+                # If the deleted note was currently open, clear editors
+                if self.current_note_file == note_path:
+                    self.current_note_file = None
+                    self.edit_area.clear()
+                    self.view_area.clear()
+                
+                # Reload the notes list
+                self.load_notes_from_dir()
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Could not delete note: {e}")

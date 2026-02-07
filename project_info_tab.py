@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QHBoxLayout, QPushButton, QScrollArea, 
-                               QCompleter, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QHBoxLayout, QApplication, QFileDialog, QAbstractItemView)
+                               QCompleter, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QHBoxLayout, QApplication, QFileDialog, QAbstractItemView, QCheckBox)
 from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
-from utils import get_resource_path
+from utils import get_resource_path, open_system_terminal, is_windows
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
@@ -29,13 +29,15 @@ class ProjectInfoTab(QWidget):
         self.info_name_input.setPlaceholderText("key")
         self.info_value_input = QLineEdit()
         self.info_value_input.setPlaceholderText("value")
+        self.terminal_checkbox = QCheckBox("Terminal")
 
         self.add_info_button = QPushButton("Add")
         self.add_info_button.clicked.connect(self.add_project_info)
         
         self.info_form_layout.addWidget(self.info_name_input)
-        self.info_form_layout.addWidget(self.add_info_button)
         self.info_form_layout.addWidget(self.info_value_input)
+        self.info_form_layout.addWidget(self.terminal_checkbox)
+        self.info_form_layout.addWidget(self.add_info_button)
         self.info_layout.addLayout(self.info_form_layout)
 
         self.additional_info_table = QTableWidget(0, 3)
@@ -57,13 +59,15 @@ class ProjectInfoTab(QWidget):
         self.project_description_label.setText(f"Description: {description}")
         self.clear_table()
         info_dict = info if isinstance(info, str) else info
-        for key, value in info_dict.items():
-            self.add_info_item(key, value)
+        for key, info_item in info_dict.items():
+            value = info_item["value"] if isinstance(info_item, dict) else info_item
+            terminal = info_item.get("terminal", False) if isinstance(info_item, dict) else False
+            self.add_info_item(key, value, terminal)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value):
+    def add_info_item(self, key, value, terminal=False):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         
@@ -100,6 +104,17 @@ class ProjectInfoTab(QWidget):
         save_button.clicked.connect(lambda: self.save_row(row_position))
         actions_layout.addWidget(save_button)
 
+        if terminal:
+            terminal_button = QPushButton()
+            terminal_button.setIcon(QIcon(get_resource_path("assets/icons/terminal.png")))
+            if not os.path.exists(get_resource_path("assets/icons/terminal.png")):
+                # Fallback to a text button if icon missing
+                terminal_button.setText(">_")
+            terminal_button.setMaximumSize(24, 24)
+            terminal_button.setToolTip("Abrir Terminal")
+            terminal_button.clicked.connect(lambda: open_system_terminal(value))
+            actions_layout.addWidget(terminal_button)
+
         self.additional_info_table.setCellWidget(row_position, 1, actions_widget)
 
     @Slot()
@@ -115,12 +130,21 @@ class ProjectInfoTab(QWidget):
             if old_key != new_key:  # Si el key ha cambiado
                 # Actualiza el diccionario del proyecto
                 if old_key in self.main_window.current_project_info:
-                    self.main_window.current_project_info[new_key] = self.main_window.current_project_info.pop(old_key)
+                    info_item = self.main_window.current_project_info.pop(old_key)
+                    if isinstance(info_item, dict):
+                        info_item["value"] = value
+                        self.main_window.current_project_info[new_key] = info_item
+                    else:
+                        self.main_window.current_project_info[new_key] = {"value": value, "terminal": False}
                 else:
-                    self.main_window.current_project_info[new_key] = value
+                    self.main_window.current_project_info[new_key] = {"value": value, "terminal": False}
             else:
                 # Si el key no ha cambiado, solo actualiza el valor
-                self.main_window.current_project_info[new_key] = value
+                info_item = self.main_window.current_project_info.get(new_key)
+                if isinstance(info_item, dict):
+                    info_item["value"] = value
+                else:
+                    self.main_window.current_project_info[new_key] = {"value": value, "terminal": False}
 
             # Actualiza la base de datos
             projects_collection = self.main_window.db.projects
@@ -141,6 +165,7 @@ class ProjectInfoTab(QWidget):
     def set_editing_enabled(self, enabled):
         self.info_name_input.setVisible(enabled)
         self.info_value_input.setVisible(enabled)
+        self.terminal_checkbox.setVisible(enabled)
         self.add_info_button.setVisible(enabled)
 
     @Slot()
@@ -177,8 +202,10 @@ class ProjectInfoTab(QWidget):
         value = self.info_value_input.text()
 
         if name and value:
-            self.main_window.current_project_info[name] = value
-            self.add_info_item(name, value)
+            terminal_enabled = self.terminal_checkbox.isChecked()
+            info_data = {"value": value, "terminal": terminal_enabled}
+            self.main_window.current_project_info[name] = info_data
+            self.add_info_item(name, value, terminal_enabled)
 
             projects_collection = self.main_window.db.projects
             projects_collection.update_one(
@@ -190,6 +217,7 @@ class ProjectInfoTab(QWidget):
 
             self.info_name_input.clear()
             self.info_value_input.clear()
+            self.terminal_checkbox.setChecked(False)
 
     @Slot()
     def copy_to_clipboard(self, text):

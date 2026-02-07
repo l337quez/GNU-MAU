@@ -2,7 +2,7 @@ import sys
 import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton,
                                QListWidgetItem, QHBoxLayout, QFileDialog, QTableWidget, QTableWidgetItem,
-                               QHeaderView, QCompleter, QApplication)
+                               QHeaderView, QCompleter, QApplication, QCheckBox)
 from PySide6.QtCore import Slot, Qt
 import json
 from PySide6.QtGui import QIcon, QClipboard
@@ -47,10 +47,12 @@ class ProjectTab(QWidget):
         self.info_name_input.setPlaceholderText("key")
         self.info_value_input = QLineEdit()
         self.info_value_input.setPlaceholderText("value")
+        self.terminal_checkbox = QCheckBox("Terminal")
         self.add_info_button = QPushButton("Add")
         self.add_info_button.clicked.connect(self.add_project_info)
         self.info_form_layout.addWidget(self.info_name_input)
         self.info_form_layout.addWidget(self.info_value_input)
+        self.info_form_layout.addWidget(self.terminal_checkbox)
         self.info_form_layout.addWidget(self.add_info_button)
         layout.addLayout(self.info_form_layout)
 
@@ -76,6 +78,7 @@ class ProjectTab(QWidget):
         self.info_name_input.setVisible(enabled)
         self.description_input.setVisible(enabled) 
         self.info_value_input.setVisible(enabled)
+        self.terminal_checkbox.setVisible(enabled)
         self.add_info_button.setVisible(enabled)
         self.edit_button.setEnabled(not enabled)
 
@@ -177,7 +180,9 @@ class ProjectTab(QWidget):
         value = self.info_value_input.text()
         if name and value:
             # 1. Actualizar el diccionario en memoria
-            self.main_window.current_project_info[name] = value
+            terminal_enabled = self.terminal_checkbox.isChecked()
+            info_data = {"value": value, "terminal": terminal_enabled}
+            self.main_window.current_project_info[name] = info_data
             self.add_info_item(name, value)
             
             # 2. Guardar en la base de datos
@@ -203,6 +208,7 @@ class ProjectTab(QWidget):
 
             self.info_name_input.clear()
             self.info_value_input.clear()
+            self.terminal_checkbox.setChecked(False)
 
 
 
@@ -216,7 +222,8 @@ class ProjectTab(QWidget):
     def update_additional_info_table(self):
         self.clear_table()
         info_dict = getattr(self.main_window, 'current_project_info', {})
-        for key, value in info_dict.items():
+        for key, info_item in info_dict.items():
+            value = info_item["value"] if isinstance(info_item, dict) else info_item
             self.add_info_item(key, value)
 
     def clear_table(self):

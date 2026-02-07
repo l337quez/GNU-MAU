@@ -1,6 +1,6 @@
 # pyside imports
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
-                               QFileDialog, QTextEdit, QGroupBox, QCheckBox)
+                               QFileDialog, QTextEdit, QGroupBox, QCheckBox, QComboBox)
 from PySide6.QtCore import Slot, QTimer, Qt
 from pacmanprogress import Pacman
 from PySide6.QtWidgets import QMessageBox
@@ -8,6 +8,7 @@ from PySide6.QtCore import QThread, Signal
 # Other imports
 import os, json, sys, shutil
 import urllib.request
+from utils import is_windows
 
 REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
 
@@ -49,18 +50,21 @@ class SettingTab(QWidget):
         self.main_window = main_window
         self.info_layout = QVBoxLayout()
         self.theme_layout = QHBoxLayout()
-        
-        self.theme_button = QPushButton("Change Theme")
-        self.theme_button.clicked.connect(self.toggle_theme)
-        self.theme_layout.addWidget(self.theme_button)
-
-        self.theme_label = QLabel("Light Theme")
-        self.theme_layout.addWidget(self.theme_label)
-        self.tray_checkbox = QCheckBox("Minimize to tray when closing")
-        self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
-        self.info_layout.addWidget(self.tray_checkbox)
+        self.theme_layout.addWidget(QLabel("Theme:"))
+        self.theme_combo = QComboBox()
+        self.theme_layout.addWidget(self.theme_combo)
+        self.theme_combo.currentIndexChanged.connect(self.change_theme)
         
         self.info_layout.addLayout(self.theme_layout)
+
+        # Map display names to internal names
+        self.theme_map = {
+            "Arctic Mist": "arctic_mist",
+            "Amber Dusk": "amber_dusk",
+            "Dark Theme": "dark_theme",
+            "Light Theme": "Light Theme"
+        }
+        self.reverse_theme_map = {v: k for k, v in self.theme_map.items()}
 
         sidebar_group = QGroupBox("Sidebar position")
         sidebar_layout = QHBoxLayout()
@@ -88,7 +92,7 @@ class SettingTab(QWidget):
         db_group = QGroupBox("Restore Database")
         db_group_layout = QHBoxLayout() 
 
-        self.load_config_db_btn = QPushButton("Load config and apply changes")
+        self.load_config_db_btn = QPushButton("Restore data base and storage")
         self.load_config_db_btn.setFixedWidth(200) 
         self.load_config_db_btn.clicked.connect(self.copy_files)
         db_group_layout.addWidget(self.load_config_db_btn)
@@ -107,6 +111,11 @@ class SettingTab(QWidget):
         self.check_update_btn.clicked.connect(self.check_updates)
         self.info_layout.addWidget(self.check_update_btn)
 
+        # Tray checkbox
+        self.tray_checkbox = QCheckBox("Minimize to tray when closing")
+        self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
+        self.info_layout.addWidget(self.tray_checkbox)
+
         # QLabel para la barra de progreso
         self.progress_label = QLabel("")
         self.info_layout.addWidget(self.progress_label)
@@ -120,21 +129,20 @@ class SettingTab(QWidget):
 
         # Load config from JSON file
         config = self.load_config()
-        self.dark_mode = config.get("dark_mode", False)
+        self.current_theme = config.get("theme", "Light Theme")
 
         tray_setting = config.get("minimize_to_tray", True)
         self.tray_checkbox.setChecked(tray_setting)
-        if self.dark_mode:
-            qss_file = self.get_qss_path()
-            try:
-                with open(qss_file, "r") as file:
-                    self.main_window.setStyleSheet(file.read())
-                self.theme_label.setText("Dark Theme")
-            except FileNotFoundError:
-                pass 
-        else:
-            self.main_window.setStyleSheet("")
-            self.theme_label.setText("Light Theme")
+        
+        self.load_available_themes()
+        
+        # Set selection in combo box without triggering change_theme twice
+        display_name = self.reverse_theme_map.get(self.current_theme, self.current_theme)
+        index = self.theme_combo.findText(display_name)
+        if index >= 0:
+            self.theme_combo.setCurrentIndex(index)
+        
+        self.apply_theme(self.current_theme)
 
     def get_config_path(self):
         config_dir = os.path.join(os.path.expanduser("~"), ".myapp")
@@ -163,38 +171,52 @@ class SettingTab(QWidget):
                 return json.load(config_file)
         return {}
 
-    def get_qss_path(self):
+    def get_qss_path(self, theme_name):
         if getattr(sys, 'frozen', False):
-            # Estamos empaquetados con PyInstaller
             base_path = sys._MEIPASS
         else:
-            # Estamos en modo de desarrollo
-            base_path = os.path.dirname(__file__)
-        return os.path.join(base_path, "dark_theme.qss")
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base_path, "themes", f"{theme_name}.qss")
 
-    @Slot()
-    def toggle_theme(self):
-        config_update = {}
-
-        if self.dark_mode:
-            # Cambiar a tema claro
-            self.main_window.setStyleSheet("")
-            self.theme_label.setText("Light Theme")
-            config_update = {"dark_mode": False}
+    def load_available_themes(self):
+        self.theme_combo.blockSignals(True)
+        self.theme_combo.clear()
+        self.theme_combo.addItem("Light Theme")
+        
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
         else:
-            # Cambiar a tema oscuro
-            qss_file = self.get_qss_path()
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        
+        themes_dir = os.path.join(base_path, "themes")
+        if os.path.exists(themes_dir):
+            for file in os.listdir(themes_dir):
+                if file.endswith(".qss"):
+                    internal_name = file.replace(".qss", "")
+                    display_name = self.reverse_theme_map.get(internal_name, internal_name)
+                    # Check if already added (to avoid duplicates with the base ones if any)
+                    if self.theme_combo.findText(display_name) == -1:
+                        self.theme_combo.addItem(display_name)
+        self.theme_combo.blockSignals(False)
+
+    def apply_theme(self, theme_name):
+        if theme_name == "Light Theme":
+            self.main_window.setStyleSheet("")
+        else:
+            qss_file = self.get_qss_path(theme_name)
             try:
                 with open(qss_file, "r") as file:
                     self.main_window.setStyleSheet(file.read())
-                self.theme_label.setText("Dark Theme")
-                config_update = {"dark_mode": True}
             except FileNotFoundError:
-                self.status_text.append("Error: No se encontró dark_theme.qss")
-                return
+                self.status_text.append(f"Error: No se encontró {theme_name}.qss")
 
-        self.save_config(config_update)
-        self.dark_mode = not self.dark_mode
+    @Slot(int)
+    def change_theme(self, index):
+        display_name = self.theme_combo.itemText(index)
+        internal_name = self.theme_map.get(display_name, display_name)
+        self.apply_theme(internal_name)
+        self.save_config({"theme": internal_name})
+        self.current_theme = internal_name
 
     @Slot(int)
     def change_sidebar_pos(self, pos_enum):
@@ -230,14 +252,15 @@ class SettingTab(QWidget):
 
         dest_internal = os.path.join(base_path, "_internal")
 
-        # 1. Crear el script de reemplazo (Batch script)
-        # Este script esperará a que el programa se cierre, borrará y copiará.
+        # script bash, waiting for 2 seconds, then copy files
         batch_path = os.path.join(base_path, "update_data.bat")
         
         storage_src = os.path.join(source_dir, "storage")
         storage_dest = os.path.join(dest_internal, "storage")
         mongita_src = os.path.join(source_dir, "mongita_data")
         mongita_dest = os.path.join(dest_internal, "mongita_data")
+        version_src = os.path.join(source_dir, "version.txt")
+        version_dest = os.path.join(base_path, "version.txt")
 
         # Script compatible with Windows cmd
         batch_content = f"""
@@ -247,6 +270,7 @@ class SettingTab(QWidget):
         if exist "{mongita_dest}" rd /s /q "{mongita_dest}"
         if exist "{storage_src}" xcopy "{storage_src}" "{storage_dest}" /e /i /y
         if exist "{mongita_src}" xcopy "{mongita_src}" "{mongita_dest}" /e /i /y
+        if exist "{version_src}" copy /y "{version_src}" "{version_dest}"
         start "" "{exe_path}"
         del "%~f0"
         """
@@ -262,11 +286,15 @@ class SettingTab(QWidget):
                 "The application will close to update the data and will restart automatically."
             )
 
-            # 2. Ejecutar el script de forma independiente
+            # Ejecutar el script de forma independiente
             import subprocess
-            subprocess.Popen([batch_path], shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            popen_args = {"shell": True}
+            if is_windows():
+                # CREATE_NEW_CONSOLE is only available on Windows
+                popen_args["creationflags"] = 0x00000010 # subprocess.CREATE_NEW_CONSOLE
             
-            # 3. Cerrar la aplicación inmediatamente para liberar los archivos
+            subprocess.Popen([batch_path], **popen_args)
+            
             sys.exit(0)
 
         except Exception as e:
@@ -274,84 +302,7 @@ class SettingTab(QWidget):
             self.status_text.append(error_msg)
             QMessageBox.critical(self, "Error", f"Failed to prepare update: {e}")
 
-        """
-        Copy storage and mongita_data from selected _internal folder 
-        to the program's own _internal folder.
-        """
-        source_dir = QFileDialog.getExistingDirectory(self, "Seleccionar carpeta _internal de origen")
         
-        if not source_dir:
-            return
-
-        if os.path.basename(source_dir) != "_internal":
-            QMessageBox.warning(self, "Incorrect folder", 
-                                "You must specifically select the folder named '_internal'.")
-            return
-
-        if getattr(sys, 'frozen', False):
-            base_path = os.path.dirname(sys.executable)
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-
-        dest_internal = os.path.join(base_path, "_internal")
-
-        if not os.path.exists(dest_internal):
-            self.status_text.append(f"Error: Destination folder not found: {dest_internal}")
-            QMessageBox.critical(self, "Destination Error", 
-                                 "The '_internal' folder was not found in the program directory.")
-            return
-
-        folders_to_copy = ["storage", "mongita_data"]
-
-        try:
-            # 1. Force Disconnect and release file handles
-            import gc
-            import time
-
-            if hasattr(self.main_window, 'db_client') and self.main_window.db_client:
-                self.main_window.db_client.close()
-                self.main_window.db_client = None
-            
-            if hasattr(self.main_window, 'db'):
-                self.main_window.db = None
-            
-            # Explicitly clear references and collect garbage
-            gc.collect()
-            time.sleep(1.0) 
-
-            self.status_text.append(f"Starting copy to: {dest_internal}")
-
-            for folder in folders_to_copy:
-                s = os.path.join(source_dir, folder)    
-                d = os.path.join(dest_internal, folder) 
-                
-                if os.path.exists(s):
-                    self.status_text.append(f"Copiando {folder}...")
-                    
-                    if os.path.exists(d):
-                        # Retry logic for rmtree
-                        for i in range(3):
-                            try:
-                                shutil.rmtree(d)
-                                break
-                            except OSError:
-                                if i == 2: raise
-                                time.sleep(1)
-
-                    shutil.copytree(s, d)
-                else:
-                    self.status_text.append(f"Warning: '{folder}' not found in source.")
-
-            self.status_text.append("Data copy completed!")
-            QMessageBox.information(self, "Success", "Data updated. The application will close to apply changes.")
-            
-            # Force exit to ensure no corrupted sessions
-            sys.exit(0)
-            
-        except Exception as e:
-            error_msg = f"Error in copy_files: {str(e)}"
-            self.status_text.append(error_msg)
-            QMessageBox.critical(self, "Error", f"Failed to copy files: {e}")
 
     @Slot()
     def start_animation(self):
@@ -386,14 +337,16 @@ class SettingTab(QWidget):
 
 
     def check_updates(self):
-        """Inicia la búsqueda de actualizaciones"""
-        self.status_text.append("Buscando actualizaciones...")
+        """
+        Start finding updates
+        """
+        self.status_text.append("Searching for updates...")
         self.check_update_btn.setEnabled(False)
 
-        # Buscar version.txt en la misma carpeta del ejecutable/script
+        # Search for version.txt in the same folder as the executable/script
         base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
         if not os.path.exists(os.path.join(base_path, "version.txt")):
-             base_path = os.path.dirname(__file__) # Intento secundario
+             base_path = os.path.dirname(__file__) 
         
         version_path = os.path.join(base_path, "version.txt")
 
@@ -406,7 +359,7 @@ class SettingTab(QWidget):
     @Slot(bool, str, str)
     def on_update_result(self, is_available, local, remote):
         if is_available:
-            msg = f"¡Versión {remote} disponible! (Actual: {local})\n¿Ir a descargar?"
+            msg = f"¡Versión {remote}  disponible! (Actual: {local})\n¿Ir a descargar?"
             if QMessageBox.question(self, "Update", msg) == QMessageBox.Yes:
                 import webbrowser
                 webbrowser.open("https://github.com/l337quez/GNU-MAU")
