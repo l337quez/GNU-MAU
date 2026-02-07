@@ -56,6 +56,15 @@ class SettingTab(QWidget):
         
         self.info_layout.addLayout(self.theme_layout)
 
+        # Map display names to internal names
+        self.theme_map = {
+            "Arctic Mist": "arctic_mist",
+            "Amber Dusk": "amber_dusk",
+            "Dark Theme": "dark_theme",
+            "Light Theme": "Light Theme"
+        }
+        self.reverse_theme_map = {v: k for k, v in self.theme_map.items()}
+
         sidebar_group = QGroupBox("Sidebar position")
         sidebar_layout = QHBoxLayout()
 
@@ -127,7 +136,8 @@ class SettingTab(QWidget):
         self.load_available_themes()
         
         # Set selection in combo box without triggering change_theme twice
-        index = self.theme_combo.findText(self.current_theme)
+        display_name = self.reverse_theme_map.get(self.current_theme, self.current_theme)
+        index = self.theme_combo.findText(display_name)
         if index >= 0:
             self.theme_combo.setCurrentIndex(index)
         
@@ -181,7 +191,11 @@ class SettingTab(QWidget):
         if os.path.exists(themes_dir):
             for file in os.listdir(themes_dir):
                 if file.endswith(".qss"):
-                    self.theme_combo.addItem(file.replace(".qss", ""))
+                    internal_name = file.replace(".qss", "")
+                    display_name = self.reverse_theme_map.get(internal_name, internal_name)
+                    # Check if already added (to avoid duplicates with the base ones if any)
+                    if self.theme_combo.findText(display_name) == -1:
+                        self.theme_combo.addItem(display_name)
         self.theme_combo.blockSignals(False)
 
     def apply_theme(self, theme_name):
@@ -197,10 +211,11 @@ class SettingTab(QWidget):
 
     @Slot(int)
     def change_theme(self, index):
-        theme_name = self.theme_combo.itemText(index)
-        self.apply_theme(theme_name)
-        self.save_config({"theme": theme_name})
-        self.current_theme = theme_name
+        display_name = self.theme_combo.itemText(index)
+        internal_name = self.theme_map.get(display_name, display_name)
+        self.apply_theme(internal_name)
+        self.save_config({"theme": internal_name})
+        self.current_theme = internal_name
 
     @Slot(int)
     def change_sidebar_pos(self, pos_enum):

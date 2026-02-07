@@ -1,0 +1,150 @@
+/* --- AMBER DUSK THEME (Inspirado en Mau) --- */
+
+/* --- ESTILO GENERAL --- */
+QWidget {
+    background-color: #1E1E2E; /* Un fondo un poco más profundo que el Nord */
+    color: #D9E0EE;
+    font-size: 10pt;
+}
+
+/* --- BOTONES --- */
+QPushButton {
+    background-color: #313244;
+    color: #F8BD96;             /* Texto naranja suave */
+    border: 1px solid #F8BD96;  /* Borde ámbar */
+    border-radius: 4px;
+    padding: 2px;
+    min-height: 18px;
+    max-height: 22px;
+    min-width: 24px;
+}
+
+QPushButton:hover {
+    background-color: #45475A;
+    border: 1px solid #FAB387;  /* Brillo naranja más claro al pasar el mouse */
+    color: #FAB387;
+}
+
+QPushButton:pressed {
+    background-color: #F8BD96;  /* Se llena de naranja al presionar */
+    color: #1E1E2E;
+}
+
+/* --- QCOMBOBOX --- */
+QComboBox {
+    border: 1px solid #45475A;
+    border-radius: 5px;
+    padding: 5px 30px 5px 10px;
+    background-color: #313244;
+    color: #D9E0EE;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 25px;
+    border-left: 1px solid #45475A; /* Línea divisoria */
+}
+
+QComboBox::down-arrow {
+    image: none; 
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #F8BD96; /* Flecha Naranja */
+    margin-top: 2px;
+}
+
+/* --- CAMPOS DE TEXTO --- */
+QLineEdit, QTextEdit {
+    background-color: #313244;
+    color: #D9E0EE;
+    border: 1px solid #45475A;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+QLineEdit:focus, QTextEdit:focus {
+    border: 1px solid #F8BD96; /* Resalte en naranja al escribir */
+}
+
+/* --- TABS (Pestañas) --- */
+QTabBar::tab {
+    background-color: #313244;
+    color: #A6ADC8;
+    padding: 8px 15px;
+    border: 1px solid #45475A;
+    border-bottom: none;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #1E1E2E;
+    color: #F8BD96;
+    border-top: 2px solid #F8BD96;
+}
+
+/* --- PANEL Y TABLAS --- */
+QTabWidget::pane {
+    border: 1px solid #45475A;
+    top: -1px;
+    background-color: #1E1E2E;
+}
+
+QTableWidget {
+    background-color: #313244;
+    alternate-background-color: #1E1E2E;
+    gridline-color: #45475A;
+    border: 1px solid #45475A;
+    color: #D9E0EE;
+}
+
+QHeaderView::section {
+    background-color: #313244;
+    color: #F8BD96;
+    padding: 5px;
+    border: 1px solid #1E1E2E;
+    font-weight: bold;
+}
+
+QTableWidget::item:selected {
+    background-color: #F8BD96;
+    color: #1E1E2E;
+}
+
+/* --- GROUPBOX --- */
+QGroupBox {
+    border: 1px solid #45475A;
+    border-radius: 6px;
+    margin-top: 1.2em;
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 10px;
+    padding: 0 5px;
+    color: #F8BD96;
+}
+
+/* --- SCROLLBAR MINIMALISTA --- */
+QScrollBar:vertical {
+    border: none;
+    background: #1E1E2E;
+    width: 8px;
+}
+
+QScrollBar::handle:vertical {
+    background: #45475A;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #F8BD96; /* El scroll se vuelve naranja al tocarlo */
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}

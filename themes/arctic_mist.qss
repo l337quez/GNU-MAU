@@ -123,3 +123,90 @@ QHeaderView {
     background-color: #3B4252;
     border: none;
 }
+
+
+/* --- SCROLLBAR VERTICAL --- */
+QScrollBar:vertical {
+    border: none;
+    background: #2E3440; /* Fondo igual al general */
+    width: 10px;         /* Más delgado y elegante */
+    margin: 0px 0px 0px 0px;
+}
+
+/* La barrita que se mueve */
+QScrollBar::handle:vertical {
+    background: #4C566A; /* Color gris azulado */
+    min-height: 20px;
+    border-radius: 5px;  /* Bordes redondeados */
+    margin: 2px;         /* Pequeño margen para que parezca flotar */
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #88C0D0; /* Color azul brillante al pasar el mouse */
+}
+
+/* Eliminar las flechas de arriba y abajo */
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+/* --- SCROLLBAR HORIZONTAL (Opcional por si aparece) --- */
+QScrollBar:horizontal {
+    border: none;
+    background: #2E3440;
+    height: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #4C566A;
+    min-width: 20px;
+    border-radius: 5px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #88C0D0;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* --- GROUPBOX  --- */
+QGroupBox {
+    border: 1px solid #4C566A; /* Gris azulado sutil en lugar de blanco */
+    border-radius: 6px;
+    margin-top: 1.2em; /* Espacio para el título */
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left; /* Título arriba a la izquierda */
+    left: 10px;
+    padding: 0 5px;
+    color: #88C0D0; /* El azul claro que combina con tus botones */
+}
+
+
+/* --- CAMPO DE TEXTO MULTILiNEA (QTextEdit) --- */
+QTextEdit {
+    background-color: #3B4252;
+    color: #ECEFF4;
+    border: 1px solid #4C566A;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QTextEdit:focus {
+    border: 1px solid #88C0D0;
+}
