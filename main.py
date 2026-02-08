@@ -19,10 +19,8 @@ from project_note_tab import ProjectNoteTab
 from utils import get_resource_path, is_windows
 
 
-# load env file
 load_dotenv()
 
-# Establecer explícitamente el ID de modelo de usuario de aplicación en Windows
 if is_windows():
     import ctypes
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(u'CompanyName.ProductName.SubProduct.VersionInformation')
@@ -53,7 +51,6 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("GNU Mau")
         self.setGeometry(300, 300, 800, 600)
 
-        # --- CAMBIO 1: Inicializar directorio base storage ---
         self.storage_dir = os.path.join(os.path.dirname(__file__), "storage")
         if not os.path.exists(self.storage_dir):
             try:
@@ -61,7 +58,6 @@ class MainWindow(QMainWindow):
                 print(f"Directorio principal 'storage' creado en: {self.storage_dir}")
             except OSError as e:
                 print(f"Error al crear directorio storage: {e}")
-        # -----------------------------------------------------
 
         self.config_path = os.path.join(os.path.expanduser("~"), ".myapp", "config.json")
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)

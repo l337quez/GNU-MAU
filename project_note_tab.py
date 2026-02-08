@@ -21,22 +21,49 @@ class ProjectNoteTab(QWidget):
 
         self.preview_css = """
         <style>
-            body { font-family: 'Segoe UI', sans-serif; padding: 20px; line-height: 1.6; color: #333; }
-            h1, h2, h3 { color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            body { 
+                font-family: 'Segoe UI', sans-serif; 
+                padding: 20px; 
+                line-height: 1.6; 
+                color: inherit; /* Seguir el color del tema */
+            }
+            h1, h2, h3 { 
+                color: inherit; 
+                border-bottom: 1px solid rgba(128, 128, 128, 0.2); 
+                padding-bottom: 5px; 
+            }
             
-            /* Estilos para código */
-            pre { background-color: #f4f4f4; border: 1px solid #ddd; padding: 10px; border-radius: 5px; font-family: 'Consolas', monospace; }
-            code { background-color: #f4f4f4; color: #c7254e; padding: 2px 4px; border-radius: 3px; font-family: 'Consolas', monospace; }
+            /* Estilos para código - Usamos fondos semi-transparentes para que se adapten */
+            pre { 
+                background-color: rgba(128, 128, 128, 0.1); 
+                border: 1px solid rgba(128, 128, 128, 0.2); 
+                padding: 10px; 
+                border-radius: 5px; 
+                font-family: 'Consolas', monospace; 
+                color: inherit;
+            }
+            code { 
+                background-color: rgba(128, 128, 128, 0.1); 
+                color: #c7254e; 
+                padding: 2px 4px; 
+                border-radius: 3px; 
+                font-family: 'Consolas', monospace; 
+            }
             
             /* Estilo para Citas */
-            blockquote { border-left: 5px solid #3498db; margin: 10px 0; padding: 10px 20px; color: #555; background-color: #f0f8ff; }
+            blockquote { 
+                border-left: 5px solid #3498db; 
+                margin: 10px 0; 
+                padding: 10px 20px; 
+                color: inherit; 
+                opacity: 0.9;
+                background-color: rgba(52, 152, 219, 0.1); 
+            }
             
-            /* NUEVO: Estilos para Tablas */
-            table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; font-weight: bold; color: #333; }
-            tr:nth-child(even) { background-color: #f9f9f9; }
-            tr:hover { background-color: #f1f1f1; }
+            /* Estilos para Tablas */
+            table { border-collapse: collapse; width: 100%; margin: 15px 0; color: inherit; }
+            th, td { border: 1px solid rgba(128, 128, 128, 0.3); padding: 8px; text-align: left; }
+            th { background-color: rgba(128, 128, 128, 0.1); font-weight: bold; }
             
             /* Estilo para Links */
             a { color: #3498db; text-decoration: none; font-weight: bold; }
@@ -169,7 +196,9 @@ class ProjectNoteTab(QWidget):
         self.setEnabled(False)
     
     def keyPressEvent(self, event):
-        """Handle Delete key press to delete selected note"""
+        """
+        Handle Delete key press to delete selected note
+        """
         if event.key() == Qt.Key_Delete:
             # Check if notes list has focus and an item is selected
             if self.notes_list_widget.hasFocus() and self.notes_list_widget.currentItem():
@@ -238,7 +267,7 @@ class ProjectNoteTab(QWidget):
                     content = f.read()
                     self.edit_area.setPlainText(content)
                     
-                    self.render_markdown() # Renderizar
+                    self.render_markdown()
                     
                     self.mode_btn.setChecked(True)
                     self.stack.setCurrentIndex(1)
@@ -253,7 +282,7 @@ class ProjectNoteTab(QWidget):
                 with open(self.current_note_file, 'w', encoding='utf-8') as f:
                     f.write(content)
                 if self.mode_btn.isChecked():
-                    self.render_markdown() # Renderizar
+                    self.render_markdown()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not save: {e}")
 

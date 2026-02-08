@@ -89,10 +89,10 @@ class SettingTab(QWidget):
         sidebar_group.setLayout(sidebar_layout)
         self.info_layout.addWidget(sidebar_group)
 
-        db_group = QGroupBox("Restore Database")
+        db_group = QGroupBox("Restore database and storage")
         db_group_layout = QHBoxLayout() 
 
-        self.load_config_db_btn = QPushButton("Restore data base and storage")
+        self.load_config_db_btn = QPushButton("Manual restoration")
         self.load_config_db_btn.setFixedWidth(200) 
         self.load_config_db_btn.clicked.connect(self.copy_files)
         db_group_layout.addWidget(self.load_config_db_btn)
