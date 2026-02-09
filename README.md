@@ -2,59 +2,79 @@
   <img src="assets/app/mau.png" alt="GNU Mau Logo" width="400">
 </p>
 
-# GNU  Mau 😸​​🔧​
-It is tool designed to organize and store commands, credentials, and project-specific information. Although it is primarily aimed at backend and DevOps programmers, anyone who finds it useful can take advantage of it.
+# GNU Mau 😸🔧
 
+**GNU Mau** (Multipurpose Automation Utility) is a specialized productivity tool designed for **Backend Engineers and DevOps Professionals**. It provides a centralized hub to organize projects, store critical commands, manage credentials, and keep track of daily tasks through a streamlined, themeable interface.
 
- MAU  (Multipurpose Automation Utility)
+---
 
-</br>
+## ✨ Key Features
+
+### � Project Management
+- **Centralized Info**: Store project-specific credentials, URLs, and documentation.
+- **Embedded Terminal**: Execute project commands directly from the interface using quick-access terminal buttons.
+- **Quick Copy**: One-click copying for sensitive data like API keys or server IPs.
+
+### ✅ Advanced TODO Lists
+- **Rich Text Support**: Bold formatting for important tasks.
+- **Emoji Picker**: Personalize your lists with a built-in emoji selector.
+- **Auto-Save**: Never lose progress with background saving.
+- **Quick Copy**: Share your task lists instantly with the "Copy to Clipboard" feature.
+
+### 📝 Markdown Notes
+- **Live Preview**: Write in Markdown and see the rendered result instantly.
+- **Theme-Aware**: Preview styles adjust automatically to your active theme (Dark/Light/Arctic).
+- **Clean Formatting**: Use the "Sweep" tool to strip formatting and keep your notes tidy.
+- **Emoji & Links**: Full support for emojis and clickable hyperlink insertion.
+
+### 🎨 Premium UI & Customization
+- **Dynamic Themes**: Choose from **Arctic Mist**, **Amber Dusk**, **Dark**, or **Light** themes.
+- **System Tray**: Keep Mau running in the background for quick access.
+- **Responsive Design**: Elegant layouts built with PySide6 for a native desktop feel.
+
+---
 
 ## 🚀 Setup & Installation
-This project uses Poetry for dependency management and virtual environment isolation, similar to how npm works for Node.js. This ensures that PySide6, gkeepapi, and other tools run in a consistent environment.
 
-**Prerequisites**
-Python 3.10+
+Mau uses **Poetry** for robust dependency management, ensuring a consistent environment.
 
-Poetry: If you don't have it installed, run:
+### Prerequisites
+- Python 3.10+
+- [Poetry](https://python-poetry.org/docs/#installation)
 
-```bash
-pip install poetry
-```
+### Getting Started
 
-Getting Started (New Environment)
-If you have just cloned the repository or are setting it up on a new machine, follow these steps:
+1. **Install Dependencies**:
+   ```bash
+   poetry install
+   ```
 
-Install Dependencies: Run the following command in the project root. Poetry will read the pyproject.toml file, create a dedicated virtual environment, and install all required packages:
+2. **Activate Environment**:
+   ```bash
+   poetry shell
+   ```
 
-```bash
-poetry install
-```
-Activate the Virtual Environment: To enter the project's isolated environment, run:
+3. **Launch Application**:
+   ```bash
+   python main.py
+   ```
 
+*Tip: You can also run it directly using `poetry run python main.py`.*
 
-```bash
-poetry shell
-```
-Run the Application: Once the environment is active, launch MAU:
+---
 
+## 🛠️ Internal Development
 
-```bash
-python main.py
-```
+To maintain a healthy codebase, please use Poetry for dependency changes:
 
-Alternatively, you can run it without entering the shell using: poetry run python main.py  
+- **Add Package**: `poetry add <package-name>`
+- **Remove Package**: `poetry remove <package-name>`
+- **Update Dependencies**: `poetry update`
 
-</br>
+---
 
-## 🛠️ Dependency Management
-To keep the project healthy, avoid using pip directly. Instead, use Poetry commands:
+## ⚙️ Configuration & Restoration
+GNU Mau includes utilities for database management and restoration in the **Settings** tab. Always ensure you have a backup of your `projects_db` if performing manual restorations.
 
-```bash
-Add a new package: poetry add <package-name>
-
-Remove a package: poetry remove <package-name>
-
-Update all packages: poetry update
-```
-
+---
+*Designed with 🐾 for efficiency.*

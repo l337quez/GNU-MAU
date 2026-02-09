@@ -1,7 +1,8 @@
 # Pyside imports
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QListWidget, QListWidgetItem, QLineEdit, QAbstractItemView, QMessageBox
+    QListWidget, QListWidgetItem, QLineEdit, QAbstractItemView, QMessageBox,
+    QApplication
 )
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QTextCursor, QTextCharFormat, QFont
@@ -79,6 +80,12 @@ class ProjectTodoTab(QWidget):
         self.bold_btn.setFixedWidth(35)
         self.bold_btn.clicked.connect(self.toggle_bold) 
         self.toolbar_layout.addWidget(self.bold_btn)
+
+        self.copy_btn = QPushButton("📋")
+        self.copy_btn.setFixedWidth(35)
+        self.copy_btn.setToolTip("Copy TODO List")
+        self.copy_btn.clicked.connect(self.copy_to_clipboard)
+        self.toolbar_layout.addWidget(self.copy_btn)
 
         
         self.toolbar_layout.addStretch()
@@ -239,3 +246,11 @@ class ProjectTodoTab(QWidget):
         
         self.text_editor.setFocus()
         self.start_save_timer()
+
+    def copy_to_clipboard(self):
+        content = self.text_editor.toPlainText()
+        if content:
+            QApplication.clipboard().setText(content)
+            self.main_window.statusBar().showMessage("TODO list copied to clipboard!", 3000)
+        else:
+            self.main_window.statusBar().showMessage("Nothing to copy.", 3000)
