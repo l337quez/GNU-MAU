@@ -221,7 +221,7 @@ class MainWindow(QMainWindow):
         self.project_tab.name_input.clear()
         self.project_tab.description_input.clear()
         self.project_tab.clear_table() 
-        self.project_tab.set_editing_enabled(True) 
+        self.project_tab.change_icon_button.setEnabled(False) 
         self.tabs.setCurrentWidget(self.project_tab)
 
     def load_projects(self):
@@ -316,7 +316,6 @@ class MainWindow(QMainWindow):
         self.project_note_tab.set_project_id(self.current_project_id)
 
         self.project_info_tab.clear_search()
-        self.project_tab.enable_editing()
         self.tabs.setCurrentWidget(self.project_info_tab)
 
     @Slot()

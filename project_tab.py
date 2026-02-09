@@ -7,7 +7,7 @@ from PySide6.QtCore import Slot, Qt
 import json
 from PySide6.QtGui import QIcon, QClipboard
 from bson.objectid import ObjectId
-from utils import get_resource_path
+from utils import get_resource_path, open_system_terminal
 class ProjectTab(QWidget):
     def __init__(self, main_window):
         super().__init__()
@@ -22,41 +22,71 @@ class ProjectTab(QWidget):
 
         description_label = QLabel("Project description")
         self.description_input = QTextEdit()
+        self.description_input.setMaximumHeight(60) # Altura reducida
         layout.addWidget(description_label)
         layout.addWidget(self.description_input)
 
-        # Botones Principales
-        buttons_layout = QHBoxLayout()
-        self.edit_button = QPushButton("Edit")
-        self.edit_button.clicked.connect(self.enable_editing)
-        
-        self.change_icon_button = QPushButton("Change Icon")
+        # Toolbar (Single Unified Row)
+        self.toolbar_layout = QHBoxLayout()
+        self.toolbar_layout.setSpacing(10)
+
+        self.change_icon_button = QPushButton("🖼️ Icon")
+        self.change_icon_button.setFixedWidth(100)
+        self.change_icon_button.setEnabled(False) # Bloqueado por defecto
         self.change_icon_button.clicked.connect(self.change_icon)
         
-        save_button = QPushButton("Project save")
-        save_button.clicked.connect(self.save_project)
-        
-        buttons_layout.addWidget(self.edit_button)
-        buttons_layout.addWidget(self.change_icon_button)
-        buttons_layout.addWidget(save_button)
-        layout.addLayout(buttons_layout)
-
-        # Info Adicional Form
-        self.info_form_layout = QHBoxLayout()
         self.info_name_input = QLineEdit()
-        self.info_name_input.setPlaceholderText("key")
+        self.info_name_input.setPlaceholderText("Key...")
+        self.info_name_input.setFixedWidth(120)
+        
         self.info_value_input = QLineEdit()
-        self.info_value_input.setPlaceholderText("value")
+        self.info_value_input.setPlaceholderText("Value...")
+        
         self.terminal_checkbox = QCheckBox("Terminal")
-        self.add_info_button = QPushButton("Add")
-        self.add_info_button.clicked.connect(self.add_project_info)
-        self.info_form_layout.addWidget(self.info_name_input)
-        self.info_form_layout.addWidget(self.info_value_input)
-        self.info_form_layout.addWidget(self.terminal_checkbox)
-        self.info_form_layout.addWidget(self.add_info_button)
-        layout.addLayout(self.info_form_layout)
+        
+        self.save_all_button = QPushButton("💾 Save")
+        self.save_all_button.setFixedWidth(100)
+        self.save_all_button.setStyleSheet("font-weight: bold; background-color: #4CAF50; color: white;")
+        self.save_all_button.clicked.connect(self.save_project_and_info)
+        
+        # Sincronizar altura de botones (usando padding y mismo estilo base)
+        btn_style = """
+            QPushButton {
+                padding: 6px; 
+                border-radius: 4px;
+                border: 1px solid #ccc;
+            }
+            QPushButton:disabled {
+                background-color: #f0f0f0;
+                color: #888;
+                opacity: 0.5; /* Visual cue for disabled */
+                border: 1px solid #ddd;
+            }
+        """
+        self.change_icon_button.setStyleSheet(btn_style)
+        
+        save_btn_style = btn_style + """
+            QPushButton {
+                font-weight: bold; 
+                background-color: #4CAF50; 
+                color: white;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """
+        self.save_all_button.setStyleSheet(save_btn_style)
 
-        # Tabla
+        self.toolbar_layout.addWidget(self.change_icon_button)
+        self.toolbar_layout.addWidget(self.info_name_input)
+        self.toolbar_layout.addWidget(self.info_value_input)
+        self.toolbar_layout.addWidget(self.terminal_checkbox)
+        self.toolbar_layout.addWidget(self.save_all_button)
+        
+        layout.addLayout(self.toolbar_layout)
+
+        # Table
         self.additional_info_table = QTableWidget(0, 3)
         self.additional_info_table.setHorizontalHeaderLabels(["Key", "Value", "Actions"])
         self.additional_info_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -65,22 +95,86 @@ class ProjectTab(QWidget):
         layout.addWidget(self.additional_info_table)
 
         self.setLayout(layout)
-        self.set_editing_enabled(False)
 
     
     @Slot()
-    def enable_editing(self):
-        self.name_input.setReadOnly(False)
-        self.description_input.setReadOnly(False)
-        self.set_editing_enabled(True)
+    def save_project_and_info(self):
+        # 1. Si hay info nueva, la agregamos
+        key = self.info_name_input.text().strip()
+        value = self.info_value_input.text().strip()
+        
+        if key and value:
+            self.add_project_info_logic(key, value)
+            
+        # 2. Guardamos los datos base del proyecto
+        self.save_project_metadata()
 
-    def set_editing_enabled(self, enabled):
-        self.info_name_input.setVisible(enabled)
-        self.description_input.setVisible(enabled) 
-        self.info_value_input.setVisible(enabled)
-        self.terminal_checkbox.setVisible(enabled)
-        self.add_info_button.setVisible(enabled)
-        self.edit_button.setEnabled(not enabled)
+    def add_project_info_logic(self, name, value):
+        # Actualizar el diccionario en memoria
+        terminal_enabled = self.terminal_checkbox.isChecked()
+        info_data = {"value": value, "terminal": terminal_enabled}
+        self.main_window.current_project_info[name] = info_data
+        self.add_info_item(name, value)
+        
+        # Limpiar inputs de info
+        self.info_name_input.clear()
+        self.info_value_input.clear()
+        self.terminal_checkbox.setChecked(False)
+
+    def save_project_metadata(self):
+        project_name = self.name_input.text().strip()
+        project_description = self.description_input.toPlainText().strip()
+
+        if not project_name:
+            return
+
+        projects_collection = self.main_window.db.projects
+
+        # Caso: Proyecto Nuevo
+        if self.main_window.current_project_item is None:
+            default_path = "assets/project_images/default_icon.png"
+            project_doc = {
+                "name": project_name,
+                "description": project_description,
+                "info": self.main_window.current_project_info, 
+                "icon_path": default_path 
+            }
+            result = projects_collection.insert_one(project_doc)
+            self.main_window.current_project_id = result.inserted_id
+            
+            # Crear item en lista
+            new_item = QListWidgetItem(f"{project_name}: {project_description[:8]}...")
+            new_item.setIcon(QIcon(default_path))
+            new_item.setData(Qt.UserRole, self.main_window.current_project_id)
+            new_item.setData(Qt.UserRole + 1, default_path)
+            self.main_window.project_list_widget.addItem(new_item)
+            self.main_window.current_project_item = new_item
+            
+            # Habilitar el botón de icono después de guardar el primer proyecto
+            self.change_icon_button.setEnabled(True)
+        
+        # Caso: Proyecto Existente
+        else:
+            projects_collection.update_one(
+                {"_id": self.main_window.current_project_id},
+                {"$set": {
+                    "name": project_name,
+                    "description": project_description,
+                    "info": self.main_window.current_project_info
+                }}
+            )
+            
+            # Actualizar solo el texto del item
+            self.main_window.current_project_item.setText(f"{project_name}: {project_description[:8]}...")
+
+        # Feedback visual
+        self.main_window.statusBar().showMessage(f"Project '{project_name}' saved successfully!", 3000)
+        
+        # Sincronizar con la otra pestaña si existe
+        if hasattr(self.main_window, 'project_info_tab'):
+            self.main_window.project_info_tab.update_project_info(
+                project_name, project_description, self.main_window.current_project_info
+            )
 
     @Slot()
     def change_icon(self):
@@ -122,101 +216,16 @@ class ProjectTab(QWidget):
             # 3. Refrescar el icono en el resto de la interfaz
             self.main_window.update_project_icon(self.name_input.text(), icon_path)
 
-    @Slot()
-    def save_project(self):
-        project_name = self.name_input.text()
-        project_description = self.description_input.toPlainText()
-
-        if not project_name or not project_description:
-            return
-
-        projects_collection = self.main_window.db.projects
-
-        # Caso: Proyecto Nuevo
-        if self.main_window.current_project_item is None:
-            default_path = "assets/project_images/default_icon.png"
-            project_doc = {
-                "name": project_name,
-                "description": project_description,
-                "info": {}, 
-                "icon_path": default_path 
-            }
-            result = projects_collection.insert_one(project_doc)
-            self.main_window.current_project_id = result.inserted_id
-            
-            # Crear item en lista
-            new_item = QListWidgetItem(f"{project_name}: {project_description[:8]}...")
-            new_item.setIcon(QIcon(default_path))
-            new_item.setData(Qt.UserRole, self.main_window.current_project_id)
-            new_item.setData(Qt.UserRole + 1, default_path)
-            self.main_window.project_list_widget.addItem(new_item)
-            self.main_window.current_project_item = new_item
-            print("DEBUG: Nuevo proyecto creado.")
-
-        # Caso: Proyecto Existente
-        else:
-            # IMPORTANTE: Aquí NO incluimos icon_path para que sea INDEPENDIENTE
-            projects_collection.update_one(
-                {"_id": self.main_window.current_project_id},
-                {"$set": {
-                    "name": project_name,
-                    "description": project_description,
-                    "info": self.main_window.current_project_info
-                }}
-            )
-            
-            # Actualizar solo el texto del item
-            self.main_window.current_project_item.setText(f"{project_name}: {project_description[:8]}...")
-            print(f"DEBUG: Texto del proyecto {self.main_window.current_project_id} actualizado.")
-
-        self.name_input.setReadOnly(True)
-        self.description_input.setReadOnly(True)
-        self.set_editing_enabled(False)
-
-
-    @Slot()
-    def add_project_info(self):
-        name = self.info_name_input.text()
-        value = self.info_value_input.text()
-        if name and value:
-            # 1. Actualizar el diccionario en memoria
-            terminal_enabled = self.terminal_checkbox.isChecked()
-            info_data = {"value": value, "terminal": terminal_enabled}
-            self.main_window.current_project_info[name] = info_data
-            self.add_info_item(name, value)
-            
-            # 2. Guardar en la base de datos
-            if self.main_window.current_project_id:
-                p_id = self.main_window.current_project_id
-                if isinstance(p_id, str):
-                    try:
-                        p_id = ObjectId(p_id)
-                    except:
-                        pass
-                
-                self.main_window.db.projects.update_one(
-                    {"_id": p_id},
-                    {"$set": {"info": self.main_window.current_project_info}}
-                )
-            
-            if hasattr(self.main_window, 'project_info_tab'):
-                self.main_window.project_info_tab.update_project_info(
-                    self.main_window.current_project_name,
-                    self.main_window.current_project_description,
-                    self.main_window.current_project_info
-                )
-
-            self.info_name_input.clear()
-            self.info_value_input.clear()
-            self.terminal_checkbox.setChecked(False)
-
-
-
     def update_project_form(self, name, description):
         self.name_input.setText(name)
         self.description_input.setText(description)
-        self.name_input.setReadOnly(True)
-        self.description_input.setReadOnly(True)
+        # Campos siempre editables
+        self.name_input.setReadOnly(False)
+        self.description_input.setReadOnly(False)
+        
+        # Habilitar el botón de icono cuando se carga un proyecto
+        self.change_icon_button.setEnabled(True)
+        
         self.update_additional_info_table()
 
     def update_additional_info_table(self):
@@ -224,21 +233,41 @@ class ProjectTab(QWidget):
         info_dict = getattr(self.main_window, 'current_project_info', {})
         for key, info_item in info_dict.items():
             value = info_item["value"] if isinstance(info_item, dict) else info_item
-            self.add_info_item(key, value)
+            terminal = info_item.get("terminal", False) if isinstance(info_item, dict) else False
+            self.add_info_item(key, value, terminal)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value):
+    def add_info_item(self, key, value, terminal=False):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         self.additional_info_table.setItem(row_position, 0, QTableWidgetItem(key))
         self.additional_info_table.setItem(row_position, 1, QTableWidgetItem(value))
+        
+        actions_widget = QWidget()
+        actions_layout = QHBoxLayout()
+        actions_layout.setContentsMargins(0, 0, 0, 0)
+        actions_layout.setSpacing(2)
+        actions_widget.setLayout(actions_layout)
+
         copy_button = QPushButton()
         copy_button.setIcon(QIcon(get_resource_path("assets/icons/icon_copy.png")))
         copy_button.setMaximumSize(24, 24)
         copy_button.clicked.connect(lambda: self.copy_to_clipboard(value))
-        self.additional_info_table.setCellWidget(row_position, 2, copy_button)
+        actions_layout.addWidget(copy_button)
+
+        if terminal:
+            terminal_button = QPushButton()
+            terminal_button.setIcon(QIcon(get_resource_path("assets/icons/terminal.png")))
+            if not os.path.exists(get_resource_path("assets/icons/terminal.png")):
+                terminal_button.setText(">_")
+            terminal_button.setMaximumSize(24, 24)
+            terminal_button.setToolTip("Open Terminal")
+            terminal_button.clicked.connect(lambda: open_system_terminal(value))
+            actions_layout.addWidget(terminal_button)
+
+        self.additional_info_table.setCellWidget(row_position, 2, actions_widget)
 
     @Slot()
     def copy_to_clipboard(self, text):
