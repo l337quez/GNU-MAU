@@ -89,16 +89,44 @@ class SettingTab(QWidget):
         sidebar_group.setLayout(sidebar_layout)
         self.info_layout.addWidget(sidebar_group)
 
-        db_group = QGroupBox("Restore Database")
-        db_group_layout = QHBoxLayout() 
+        # Restoration Section
+        db_group = QGroupBox("Restoration")
+        db_group_v_layout = QVBoxLayout()
+        
+        buttons_layout = QHBoxLayout()
+        
+        self.manual_restore_btn = QPushButton("Manual restoration")
+        self.manual_restore_btn.setFixedWidth(160)
+        self.manual_restore_btn.clicked.connect(self.copy_files)
+        
+        self.auto_restore_btn = QPushButton("Automatic restoration")
+        self.auto_restore_btn.setFixedWidth(160)
+        # Placeholder for automatic restoration logic
+        self.auto_restore_btn.clicked.connect(lambda: QMessageBox.information(self, "Coming Soon", "Automatic restoration is coming soon."))
+        
+        buttons_layout.addWidget(self.manual_restore_btn)
+        buttons_layout.addWidget(self.auto_restore_btn)
+        buttons_layout.addStretch()
+        
+        db_group_v_layout.addLayout(buttons_layout)
+        
+        # Instructional Note
+        self.restoration_note = QLabel("<i>Note: for manual restoration you must select the folder where you have the data and then select the _internal folder</i>")
+        self.restoration_note.setStyleSheet("""
+            QLabel {
+                color: #95a5a6;
+                font-size: 11px;
+                padding: 10px;
+                border: 1px solid rgba(149, 165, 166, 0.2);
+                border-radius: 5px;
+                background-color: rgba(149, 165, 166, 0.05);
+                margin-top: 5px;
+            }
+        """)
+        self.restoration_note.setWordWrap(True)
+        db_group_v_layout.addWidget(self.restoration_note)
 
-        self.load_config_db_btn = QPushButton("Restore data base and storage")
-        self.load_config_db_btn.setFixedWidth(200) 
-        self.load_config_db_btn.clicked.connect(self.copy_files)
-        db_group_layout.addWidget(self.load_config_db_btn)
-        db_group_layout.addStretch()
-
-        db_group.setLayout(db_group_layout)
+        db_group.setLayout(db_group_v_layout)
         self.info_layout.addWidget(db_group)
 
         self.animate_button = QPushButton("Animation Start")

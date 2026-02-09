@@ -26,14 +26,10 @@ def open_system_terminal(command):
     """
     try:
         if is_windows():
-            # Using 'start cmd /k' ensures it opens in a new default terminal/console host
-            # /k keeps the terminal open to see output
             subprocess.Popen(f'start cmd /k "{command}"', shell=True)
         elif is_macos():
-            # macOS: use AppleScript to open Terminal and run the command
             subprocess.Popen(['osascript', '-e', f'tell application "Terminal" to do script "{command}"'])
         else:
-            # Linux: try common terminal emulators
             terminal_emulators = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xterm']
             for term in terminal_emulators:
                 try:

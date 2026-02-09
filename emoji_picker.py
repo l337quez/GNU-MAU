@@ -10,7 +10,6 @@ class EmojiPicker(QDialog):
         self.setFixedSize(300, 400) 
         self.selected_emoji = None
         
-        # Layout principal
         layout = QVBoxLayout(self)
         
         self.search_input = QLineEdit()

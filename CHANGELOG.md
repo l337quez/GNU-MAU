@@ -64,3 +64,9 @@
 - Modify list theme.    
 - Add button to open terminal.
 - New version 0.1.9 (2026-02-07)
+
+#### ⟳ Changelog Beta version 0.1.10 (2026-02-08)
+- Fixed color of the text in the notes tab.
+- Changed info layout in settings tab.
+- Add copy icon in notes tab.
+
