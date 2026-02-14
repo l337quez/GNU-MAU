@@ -1,14 +1,41 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QPushButton,
-                               QHBoxLayout, QLineEdit, QListWidget, 
-                               QListWidgetItem, QMessageBox, QSplitter, 
-                               QInputDialog, QStackedWidget)
-from PySide6.QtGui import (QFont, QTextCursor, Qt)
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLineEdit, QListWidget, QListWidgetItem)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+                               QTextEdit, QLineEdit, QListWidget, QListWidgetItem, 
+                               QMessageBox, QSplitter, QInputDialog, QStackedWidget, 
+                               QRadioButton, QDialogButtonBox, QLabel, QDialog)
+from PySide6.QtGui import (QFont, QTextCursor, Qt, QTextCharFormat)
 from PySide6.QtCore import (Qt, Slot)
 
 import os, markdown2
 from utils import get_resource_path, clean_text_format
-from emoji_picker import  EmojiPicker
+from emoji_picker import EmojiPicker
+from todo_text_editor import TodoTextEditor
+
+class NewNoteDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("New Note")
+        self.setFixedWidth(300)
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel("Note Name:"))
+        self.name_input = QLineEdit()
+        self.name_input.setPlaceholderText("Enter note name...")
+        layout.addWidget(self.name_input)
+
+        layout.addWidget(QLabel("Note Type:"))
+        self.md_radio = QRadioButton("Markdown (.md)")
+        self.txt_radio = QRadioButton("Rich Text (.txt)")
+        self.md_radio.setChecked(True)
+        layout.addWidget(self.md_radio)
+        layout.addWidget(self.txt_radio)
+
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+
+    def get_data(self):
+        return self.name_input.text(), ".txt" if self.txt_radio.isChecked() else ".md"
 
 class ProjectNoteTab(QWidget):
     def __init__(self, main_window):
@@ -18,6 +45,7 @@ class ProjectNoteTab(QWidget):
         self.current_note_file = None
         self.project_id = None
         self.notes_dir = ""
+        self.is_rich_text = False # Nueva bandera para el modo de la nota
 
         self.preview_css = """
         <style>
@@ -157,8 +185,8 @@ class ProjectNoteTab(QWidget):
 
         # Stacked Widget
         self.stack = QStackedWidget()
-        self.edit_area = QTextEdit()
-        self.edit_area.setPlaceholderText("Write your notes here... Use Markdown!")
+        self.edit_area = TodoTextEditor() # Usamos TodoTextEditor para tener checkboxes en todas las notas
+        self.edit_area.setPlaceholderText("Write your notes here... Use Markdown or formatting buttons!")
         self.edit_area.setStyleSheet("font-family: 'Consolas', 'Monaco', monospace; font-size: 14px; padding: 15px;")
         
         self.view_area = QTextEdit()
@@ -181,16 +209,15 @@ class ProjectNoteTab(QWidget):
         self.clean_button.clicked.connect(lambda: clean_text_format(self.edit_area, self.save_current_note))
         self.search_input.textChanged.connect(self.filter_notes)
         
-        # Lógica de inserción
-        self.bold_btn.clicked.connect(lambda: self.insert_md("**", "**"))
-        self.italic_btn.clicked.connect(lambda: self.insert_md("*", "*"))
+        # Lógica de inserción/formato dinámica
+        self.bold_btn.clicked.connect(self.handle_bold)
+        self.italic_btn.clicked.connect(self.handle_italic)
         self.quote_btn.clicked.connect(lambda: self.insert_md("> ", ""))
         self.code_btn.clicked.connect(lambda: self.insert_md("```\n", "\n```"))
         
-
-        self.header_btn.clicked.connect(lambda: self.insert_md("# ", ""))
-        self.list_btn.clicked.connect(lambda: self.insert_md("- ", ""))
-        self.link_btn.clicked.connect(lambda: self.insert_md("[", "](url)")) 
+        self.header_btn.clicked.connect(self.handle_header)
+        self.list_btn.clicked.connect(self.handle_list)
+        self.link_btn.clicked.connect(self.handle_link) 
 
         self.emoji_btn.clicked.connect(self.open_emoji_picker)
         self.setEnabled(False)
@@ -240,6 +267,12 @@ class ProjectNoteTab(QWidget):
 
     @Slot(bool)
     def toggle_mode(self, checked):
+        if self.is_rich_text:
+            # En modo Rich Text (.txt), no hay preview, siempre es edición visual
+            self.mode_btn.setChecked(False)
+            self.stack.setCurrentIndex(0)
+            return
+
         if checked:
             self.mode_btn.setText("✏️")
             self.mode_btn.setToolTip("Edit")
@@ -262,26 +295,42 @@ class ProjectNoteTab(QWidget):
     def open_selected_note(self, item):
         self.current_note_file = item.data(Qt.UserRole)
         if os.path.exists(self.current_note_file):
+            self.is_rich_text = self.current_note_file.endswith(".txt")
             try:
                 with open(self.current_note_file, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    self.edit_area.setPlainText(content)
                     
-                    self.render_markdown()
-                    
-                    self.mode_btn.setChecked(True)
-                    self.stack.setCurrentIndex(1)
+                    self.edit_area.blockSignals(True)
+                    if self.is_rich_text:
+                        # Para persistencia perfecta en Rich Text, usamos HTML
+                        self.edit_area.setHtml(content)
+                        self.mode_btn.setVisible(False)
+                        self.stack.setCurrentIndex(0)
+                        for btn in self.format_btns: btn.setEnabled(True)
+                    else:
+                        self.edit_area.setPlainText(content)
+                        self.mode_btn.setVisible(True)
+                        self.mode_btn.setChecked(True)
+                        self.render_markdown()
+                        self.stack.setCurrentIndex(1)
+                    self.edit_area.blockSignals(False)
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"No se pudo abrir la nota: {e}")
+                QMessageBox.critical(self, "Error", f"Could not open note: {e}")
 
     @Slot()
     def save_current_note(self):
         if self.current_note_file:
             try:
-                content = self.edit_area.toPlainText()
+                if self.is_rich_text:
+                    # Para persistencia perfecta en Rich Text, usamos HTML
+                    content = self.edit_area.toHtml()
+                else:
+                    content = self.edit_area.toPlainText()
+                
                 with open(self.current_note_file, 'w', encoding='utf-8') as f:
                     f.write(content)
-                if self.mode_btn.isChecked():
+                
+                if not self.is_rich_text and self.mode_btn.isChecked():
                     self.render_markdown()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not save: {e}")
@@ -300,16 +349,85 @@ class ProjectNoteTab(QWidget):
 
     @Slot()
     def create_new_note(self):
-        name, ok = QInputDialog.getText(self, "New Nota", "File name:")
-        if ok and name:
-            if not name.endswith(".md"): name += ".md"
-            path = os.path.join(self.notes_dir, name)
-            try:
-                with open(path, 'w', encoding='utf-8') as f: 
-                    f.write(f"# {name[:-3]}\n\n Write here...")
-                self.load_notes_from_dir()
-            except Exception as e:
-                QMessageBox.critical(self, "Error", str(e))
+        dialog = NewNoteDialog(self)
+        if dialog.exec():
+            name, ext = dialog.get_data()
+            if name:
+                if not name.lower().endswith(ext): name += ext
+                is_rich = ext == ".txt"
+                path = os.path.join(self.notes_dir, name)
+                try:
+                    with open(path, 'w', encoding='utf-8') as f: 
+                        if is_rich:
+                            # Contenido inicial en HTML para notas Rich
+                            f.write("<html><body><p>My rich note content...</p></body></html>")
+                        else:
+                            f.write(f"# {name.replace('.md', '').replace('.txt', '')}\n\nWrite here...")
+                    self.load_notes_from_dir()
+                    # Opcional: abrir la nota recién creada
+                    for i in range(self.notes_list_widget.count()):
+                        item = self.notes_list_widget.item(i)
+                        if item.data(Qt.UserRole) == path:
+                            self.notes_list_widget.setCurrentItem(item)
+                            self.open_selected_note(item)
+                            break
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", str(e))
+
+    # --- HANDLERS PARA FORMATO HIBRIDO ---
+    def handle_bold(self):
+        if self.is_rich_text:
+            cursor = self.edit_area.textCursor()
+            fmt = cursor.charFormat()
+            new_fmt = QTextCharFormat()
+            new_fmt.setFontWeight(QFont.Bold if fmt.fontWeight() != QFont.Bold else QFont.Normal)
+            cursor.mergeCharFormat(new_fmt)
+            self.edit_area.setFocus()
+        else:
+            self.insert_md("**", "**")
+
+    def handle_italic(self):
+        if self.is_rich_text:
+            cursor = self.edit_area.textCursor()
+            fmt = cursor.charFormat()
+            new_fmt = QTextCharFormat()
+            new_fmt.setFontItalic(not fmt.fontItalic())
+            cursor.mergeCharFormat(new_fmt)
+            self.edit_area.setFocus()
+        else:
+            self.insert_md("*", "*")
+
+    def handle_list(self):
+        if self.is_rich_text:
+            # Para Rich Text, usamos la lógica de checkboxes de TodoTextEditor
+            self.edit_area.add_checkboxes_to_selected_text()
+        else:
+            self.insert_md("- ", "")
+
+    def handle_header(self):
+        if self.is_rich_text:
+            cursor = self.edit_area.textCursor()
+            fmt = cursor.blockFormat()
+            # Simple simulation of header by increasing font size and bold
+            char_fmt = cursor.charFormat()
+            char_fmt.setFontPointSize(18 if char_fmt.fontPointSize() != 18 else 12)
+            char_fmt.setFontWeight(QFont.Bold if char_fmt.fontPointSize() == 18 else QFont.Normal)
+            cursor.setCharFormat(char_fmt)
+            self.edit_area.setFocus()
+        else:
+            self.insert_md("# ", "")
+
+    def handle_link(self):
+        if self.is_rich_text:
+            url, ok = QInputDialog.getText(self, "Insert Link", "URL:")
+            if ok and url:
+                cursor = self.edit_area.textCursor()
+                text = cursor.selectedText() or "link"
+                # Usamos HTML básico para el link visual si es posible
+                cursor.insertHtml(f'<a href="{url}">{text}</a>')
+                self.edit_area.setFocus()
+        else:
+            self.insert_md("[", "](url)")
 
     def filter_notes(self, text):
         for i in range(self.notes_list_widget.count()):

@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QHBoxLayout, QPushButton, QScrollArea, 
-                               QCompleter, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QHBoxLayout, QApplication, QFileDialog, QAbstractItemView, QCheckBox)
+                               QCompleter, QTableWidget, QTableWidgetItem, QHeaderView, QFrame, QApplication, QFileDialog, QAbstractItemView, QCheckBox, QComboBox)
 from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
-from utils import get_resource_path, open_system_terminal, is_windows
+from utils import get_resource_path, open_system_terminal, open_browser, is_windows
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
@@ -29,14 +29,17 @@ class ProjectInfoTab(QWidget):
         self.info_name_input.setPlaceholderText("key")
         self.info_value_input = QLineEdit()
         self.info_value_input.setPlaceholderText("value")
-        self.terminal_checkbox = QCheckBox("Terminal")
+        
+        self.action_selector = QComboBox()
+        self.action_selector.addItems(["🚫 None", "💻 Terminal", "🌐 Browser"])
+        self.action_selector.setFixedWidth(110)
 
         self.add_info_button = QPushButton("Add")
         self.add_info_button.clicked.connect(self.add_project_info)
         
         self.info_form_layout.addWidget(self.info_name_input)
         self.info_form_layout.addWidget(self.info_value_input)
-        self.info_form_layout.addWidget(self.terminal_checkbox)
+        self.info_form_layout.addWidget(self.action_selector)
         self.info_form_layout.addWidget(self.add_info_button)
         self.info_layout.addLayout(self.info_form_layout)
 
@@ -58,16 +61,23 @@ class ProjectInfoTab(QWidget):
         self.project_name_label.setText(f"Name: {name}")
         self.project_description_label.setText(f"Description: {description}")
         self.clear_table()
-        info_dict = info if isinstance(info, str) else info
+        info_dict = info if isinstance(info, dict) else {}
         for key, info_item in info_dict.items():
             value = info_item["value"] if isinstance(info_item, dict) else info_item
-            terminal = info_item.get("terminal", False) if isinstance(info_item, dict) else False
-            self.add_info_item(key, value, terminal)
+            
+            # Soporte compatibilidad
+            action = "none"
+            if isinstance(info_item, dict):
+                action = info_item.get("action")
+                if not action and info_item.get("terminal"):
+                    action = "terminal"
+            
+            self.add_info_item(key, value, action)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value, terminal=False):
+    def add_info_item(self, key, value, action=None):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         
@@ -104,16 +114,24 @@ class ProjectInfoTab(QWidget):
         save_button.clicked.connect(lambda: self.save_row(row_position))
         actions_layout.addWidget(save_button)
 
-        if terminal:
-            terminal_button = QPushButton()
-            terminal_button.setIcon(QIcon(get_resource_path("assets/icons/terminal.png")))
+        if action == "terminal":
+            term_btn = QPushButton()
+            term_btn.setIcon(QIcon(get_resource_path("assets/icons/terminal.png")))
             if not os.path.exists(get_resource_path("assets/icons/terminal.png")):
-                # Fallback to a text button if icon missing
-                terminal_button.setText(">_")
-            terminal_button.setMaximumSize(24, 24)
-            terminal_button.setToolTip("Abrir Terminal")
-            terminal_button.clicked.connect(lambda: open_system_terminal(value))
-            actions_layout.addWidget(terminal_button)
+                term_btn.setText(">_")
+            term_btn.setMaximumSize(24, 24)
+            term_btn.setToolTip("Run Terminal")
+            term_btn.clicked.connect(lambda: open_system_terminal(value))
+            actions_layout.addWidget(term_btn)
+        elif action == "browser":
+            web_btn = QPushButton()
+            web_btn.setIcon(QIcon(get_resource_path("assets/icons/browser.png")))
+            if not os.path.exists(get_resource_path("assets/icons/browser.png")):
+                web_btn.setText("🌐")
+            web_btn.setMaximumSize(24, 24)
+            web_btn.setToolTip("Open Browser")
+            web_btn.clicked.connect(lambda: open_browser(value))
+            actions_layout.addWidget(web_btn)
 
         self.additional_info_table.setCellWidget(row_position, 1, actions_widget)
 
@@ -135,16 +153,16 @@ class ProjectInfoTab(QWidget):
                         info_item["value"] = value
                         self.main_window.current_project_info[new_key] = info_item
                     else:
-                        self.main_window.current_project_info[new_key] = {"value": value, "terminal": False}
+                        self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
                 else:
-                    self.main_window.current_project_info[new_key] = {"value": value, "terminal": False}
+                    self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
             else:
                 # Si el key no ha cambiado, solo actualiza el valor
                 info_item = self.main_window.current_project_info.get(new_key)
                 if isinstance(info_item, dict):
                     info_item["value"] = value
                 else:
-                    self.main_window.current_project_info[new_key] = {"value": value, "terminal": False}
+                    self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
 
             # Actualiza la base de datos
             projects_collection = self.main_window.db.projects
@@ -165,7 +183,7 @@ class ProjectInfoTab(QWidget):
     def set_editing_enabled(self, enabled):
         self.info_name_input.setVisible(enabled)
         self.info_value_input.setVisible(enabled)
-        self.terminal_checkbox.setVisible(enabled)
+        self.action_selector.setVisible(enabled)
         self.add_info_button.setVisible(enabled)
 
     @Slot()
@@ -202,10 +220,12 @@ class ProjectInfoTab(QWidget):
         value = self.info_value_input.text()
 
         if name and value:
-            terminal_enabled = self.terminal_checkbox.isChecked()
-            info_data = {"value": value, "terminal": terminal_enabled}
+            idx = self.action_selector.currentIndex()
+            action_type = [None, "terminal", "browser"][idx]
+            
+            info_data = {"value": value, "action": action_type}
             self.main_window.current_project_info[name] = info_data
-            self.add_info_item(name, value, terminal_enabled)
+            self.add_info_item(name, value, action_type)
 
             projects_collection = self.main_window.db.projects
             projects_collection.update_one(
@@ -217,7 +237,7 @@ class ProjectInfoTab(QWidget):
 
             self.info_name_input.clear()
             self.info_value_input.clear()
-            self.terminal_checkbox.setChecked(False)
+            self.action_selector.setCurrentIndex(0)
 
     @Slot()
     def copy_to_clipboard(self, text):
