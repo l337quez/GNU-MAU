@@ -1,4 +1,4 @@
-import  sys, os, subprocess
+import sys, os, subprocess, webbrowser
 from PySide6.QtGui import QTextCursor, QTextCharFormat, QTextBlockFormat 
 
 def is_windows():
@@ -39,6 +39,17 @@ def open_system_terminal(command):
                     continue
     except Exception as e:
         print(f"Error opening terminal: {e}")
+
+def open_browser(url):
+    """
+    Opens the default web browser with the given URL.
+    """
+    try:
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        webbrowser.open(url)
+    except Exception as e:
+        print(f"Error opening browser: {e}")
 
 
 def clean_text_format(editor, on_after_clean=None):

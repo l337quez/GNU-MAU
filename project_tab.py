@@ -2,12 +2,12 @@ import sys
 import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton,
                                QListWidgetItem, QHBoxLayout, QFileDialog, QTableWidget, QTableWidgetItem,
-                               QHeaderView, QCompleter, QApplication, QCheckBox)
+                               QHeaderView, QCompleter, QApplication, QCheckBox, QComboBox)
 from PySide6.QtCore import Slot, Qt
 import json
 from PySide6.QtGui import QIcon, QClipboard
 from bson.objectid import ObjectId
-from utils import get_resource_path, open_system_terminal
+from utils import get_resource_path, open_system_terminal, open_browser
 class ProjectTab(QWidget):
     def __init__(self, main_window):
         super().__init__()
@@ -30,19 +30,21 @@ class ProjectTab(QWidget):
         self.toolbar_layout = QHBoxLayout()
         self.toolbar_layout.setSpacing(10)
 
-        self.change_icon_button = QPushButton("🖼️ Icon")
-        self.change_icon_button.setFixedWidth(100)
+        self.change_icon_button = QPushButton("🖼️")
+        self.change_icon_button.setFixedWidth(50)
         self.change_icon_button.setEnabled(False) # Bloqueado por defecto
         self.change_icon_button.clicked.connect(self.change_icon)
         
         self.info_name_input = QLineEdit()
         self.info_name_input.setPlaceholderText("Key...")
-        self.info_name_input.setFixedWidth(120)
         
         self.info_value_input = QLineEdit()
         self.info_value_input.setPlaceholderText("Value...")
+
         
-        self.terminal_checkbox = QCheckBox("Terminal")
+        self.action_selector = QComboBox()
+        self.action_selector.addItems(["🚫 None", "💻 Terminal", "🌐 Browser"])
+        self.action_selector.setFixedWidth(120)
         
         self.save_all_button = QPushButton("💾 Save")
         self.save_all_button.setFixedWidth(100)
@@ -81,7 +83,7 @@ class ProjectTab(QWidget):
         self.toolbar_layout.addWidget(self.change_icon_button)
         self.toolbar_layout.addWidget(self.info_name_input)
         self.toolbar_layout.addWidget(self.info_value_input)
-        self.toolbar_layout.addWidget(self.terminal_checkbox)
+        self.toolbar_layout.addWidget(self.action_selector)
         self.toolbar_layout.addWidget(self.save_all_button)
         
         layout.addLayout(self.toolbar_layout)
@@ -111,15 +113,17 @@ class ProjectTab(QWidget):
 
     def add_project_info_logic(self, name, value):
         # Actualizar el diccionario en memoria
-        terminal_enabled = self.terminal_checkbox.isChecked()
-        info_data = {"value": value, "terminal": terminal_enabled}
+        idx = self.action_selector.currentIndex()
+        action_type = [None, "terminal", "browser"][idx]
+
+        info_data = {"value": value, "action": action_type}
         self.main_window.current_project_info[name] = info_data
-        self.add_info_item(name, value)
+        self.add_info_item(name, value, action_type)
         
         # Limpiar inputs de info
         self.info_name_input.clear()
         self.info_value_input.clear()
-        self.terminal_checkbox.setChecked(False)
+        self.action_selector.setCurrentIndex(0) # Reset a None
 
     def save_project_metadata(self):
         project_name = self.name_input.text().strip()
@@ -233,13 +237,20 @@ class ProjectTab(QWidget):
         info_dict = getattr(self.main_window, 'current_project_info', {})
         for key, info_item in info_dict.items():
             value = info_item["value"] if isinstance(info_item, dict) else info_item
-            terminal = info_item.get("terminal", False) if isinstance(info_item, dict) else False
-            self.add_info_item(key, value, terminal)
+            
+            # Soporte compatibilidad: buscar 'action' o 'terminal'
+            action = "none"
+            if isinstance(info_item, dict):
+                action = info_item.get("action")
+                if not action and info_item.get("terminal"):
+                    action = "terminal"
+            
+            self.add_info_item(key, value, action)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value, terminal=False):
+    def add_info_item(self, key, value, action=None):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         self.additional_info_table.setItem(row_position, 0, QTableWidgetItem(key))
@@ -251,21 +262,34 @@ class ProjectTab(QWidget):
         actions_layout.setSpacing(2)
         actions_widget.setLayout(actions_layout)
 
+        # Siempre botón de copiar
         copy_button = QPushButton()
         copy_button.setIcon(QIcon(get_resource_path("assets/icons/icon_copy.png")))
         copy_button.setMaximumSize(24, 24)
+        copy_button.setToolTip("Copy to clipboard")
         copy_button.clicked.connect(lambda: self.copy_to_clipboard(value))
         actions_layout.addWidget(copy_button)
 
-        if terminal:
-            terminal_button = QPushButton()
-            terminal_button.setIcon(QIcon(get_resource_path("assets/icons/terminal.png")))
+        # Botón dinámico según acción
+        if action == "terminal":
+            term_btn = QPushButton()
+            term_btn.setIcon(QIcon(get_resource_path("assets/icons/terminal.png")))
             if not os.path.exists(get_resource_path("assets/icons/terminal.png")):
-                terminal_button.setText(">_")
-            terminal_button.setMaximumSize(24, 24)
-            terminal_button.setToolTip("Open Terminal")
-            terminal_button.clicked.connect(lambda: open_system_terminal(value))
-            actions_layout.addWidget(terminal_button)
+                term_btn.setText(">_")
+            term_btn.setMaximumSize(24, 24)
+            term_btn.setToolTip("Run in Terminal")
+            term_btn.clicked.connect(lambda: open_system_terminal(value))
+            actions_layout.addWidget(term_btn)
+            
+        elif action == "browser":
+            web_btn = QPushButton()
+            web_btn.setIcon(QIcon(get_resource_path("assets/icons/browser.png")))
+            if not os.path.exists(get_resource_path("assets/icons/browser.png")):
+                web_btn.setText("🌐")
+            web_btn.setMaximumSize(24, 24)
+            web_btn.setToolTip("Open in Browser")
+            web_btn.clicked.connect(lambda: open_browser(value))
+            actions_layout.addWidget(web_btn)
 
         self.additional_info_table.setCellWidget(row_position, 2, actions_widget)
 

@@ -5,9 +5,11 @@ from PySide6.QtCore import Slot, QTimer, Qt
 from pacmanprogress import Pacman
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QThread, Signal
+from reusable_progress import CustomProgressBar
 # Other imports
 import os, json, sys, shutil
 import urllib.request
+import zipfile, tarfile, tempfile
 from utils import is_windows
 
 REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
@@ -35,14 +37,112 @@ class UpdateCheckThread(QThread):
             self.error_occurred.emit(f"Error de conexión: {e}")
             return
 
-        def parse(v): 
-            v = v.lower().replace('v', '').strip()
-            return tuple(map(int, (v.split('.') if '.' in v else [0])))
+        def parse(v):
+            import re
+            parts = re.findall(r'\d+', v)
+            return tuple(map(int, parts)) if parts else (0,)
 
         if parse(remote_ver) > parse(local_ver):
             self.update_available.emit(True, local_ver, remote_ver)
         else:
             self.update_available.emit(False, local_ver, remote_ver)
+
+class DownloadThread(QThread):
+    progress = Signal(int)
+    finished = Signal(str) # Path to downloaded file
+    error = Signal(str)
+
+    def __init__(self, url, dest_path):
+        super().__init__()
+        self.url = url
+        self.dest_path = dest_path
+
+    def run(self):
+        try:
+            self._last_progress = -1
+            def report_hook(count, block_size, total_size):
+                if total_size > 0:
+                    progress = int(count * block_size * 100 / total_size)
+                    if progress != self._last_progress:
+                        self.progress.emit(min(progress, 100))
+                        self._last_progress = progress
+
+            urllib.request.urlretrieve(self.url, self.dest_path, reporthook=report_hook)
+            self.finished.emit(self.dest_path)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+class DiscoveryThread(QThread):
+    finished = Signal(dict)
+    error = Signal(str)
+
+    def __init__(self, api_url, v_nums):
+        super().__init__()
+        self.api_url = api_url
+        self.v_nums = v_nums
+
+    def run(self):
+        try:
+            with urllib.request.urlopen(self.api_url, timeout=5) as response:
+                files_json = json.loads(response.read().decode('utf-8'))
+                
+                target_file = None
+                # First pass: look for .zip
+                for f in files_json:
+                    if f['type'] == 'file' and self.v_nums in f['name'] and f['name'].lower().endswith('.zip'):
+                        target_file = f
+                        break
+                
+                # Second pass: look for any file (like .rar) if no .zip found
+                if not target_file:
+                    for f in files_json:
+                        if f['type'] == 'file' and self.v_nums in f['name']:
+                            target_file = f
+                            break
+                
+                if target_file:
+                    self.finished.emit(target_file)
+                else:
+                    self.error.emit(f"Could not find any file containing '{self.v_nums}'")
+        except Exception as e:
+            self.error.emit(str(e))
+
+class ExtractionThread(QThread):
+    finished = Signal(str) # new_internal path
+    error = Signal(str)
+
+    def __init__(self, archive_path, temp_dir):
+        super().__init__()
+        self.archive_path = archive_path
+        self.temp_dir = temp_dir
+
+    def run(self):
+        try:
+            extract_path = os.path.join(self.temp_dir, "extracted")
+            os.makedirs(extract_path, exist_ok=True)
+            
+            if self.archive_path.lower().endswith(".zip"):
+                with zipfile.ZipFile(self.archive_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_path)
+            elif self.archive_path.lower().endswith(".rar"):
+                raise Exception("RAR format is not supported natively by Python. Please use .ZIP for updates.")
+            else:
+                import shutil
+                shutil.unpack_archive(self.archive_path, extract_path)
+            
+            new_internal = None
+            for root, dirs, files in os.walk(extract_path):
+                if "_internal" in dirs:
+                    new_internal = os.path.join(root, "_internal")
+                    break
+            
+            if new_internal:
+                self.finished.emit(new_internal)
+            else:
+                self.error.emit("Could not find '_internal' folder in the update package.")
+        except Exception as e:
+            self.error.emit(str(e))
 
 class SettingTab(QWidget):
     def __init__(self, main_window):
@@ -90,7 +190,7 @@ class SettingTab(QWidget):
         self.info_layout.addWidget(sidebar_group)
 
         # Restoration Section
-        db_group = QGroupBox("Restoration")
+        db_group = QGroupBox("Database and storage restoration")
         db_group_v_layout = QVBoxLayout()
         
         buttons_layout = QHBoxLayout()
@@ -102,7 +202,7 @@ class SettingTab(QWidget):
         self.auto_restore_btn = QPushButton("Automatic restoration")
         self.auto_restore_btn.setFixedWidth(160)
         # Placeholder for automatic restoration logic
-        self.auto_restore_btn.clicked.connect(lambda: QMessageBox.information(self, "Coming Soon", "Automatic restoration is coming soon."))
+        self.auto_restore_btn.clicked.connect(self.check_updates)
         
         buttons_layout.addWidget(self.manual_restore_btn)
         buttons_layout.addWidget(self.auto_restore_btn)
@@ -144,9 +244,9 @@ class SettingTab(QWidget):
         self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
         self.info_layout.addWidget(self.tray_checkbox)
 
-        # QLabel para la barra de progreso
-        self.progress_label = QLabel("")
-        self.info_layout.addWidget(self.progress_label)
+        # Reusable progress bar
+        self.progress_bar = CustomProgressBar()
+        self.info_layout.addWidget(self.progress_bar)
 
         # Área de texto para mostrar mensajes de error o estado
         self.status_text = QTextEdit()
@@ -334,15 +434,15 @@ class SettingTab(QWidget):
 
     @Slot()
     def start_animation(self):
-        self.pacman = Pacman(self.progress_label, start=0, end=100, width=35, text="Progress", candy_count=35)
+        self.progress_bar.start(start=0, end=100, text="Progress", candy_count=35)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_pacman)
         self.timer.start(100)
 
     @Slot()
     def update_pacman(self):
-        self.pacman.update(1)
-        if self.pacman.step >= self.pacman.end:
+        self.progress_bar.update_progress(1)
+        if self.progress_bar.pacman and self.progress_bar.pacman.step >= self.progress_bar.pacman.end:
             self.timer.stop()
 
     @Slot()
@@ -387,13 +487,142 @@ class SettingTab(QWidget):
     @Slot(bool, str, str)
     def on_update_result(self, is_available, local, remote):
         if is_available:
-            msg = f"¡Versión {remote}  disponible! (Actual: {local})\n¿Ir a descargar?"
-            if QMessageBox.question(self, "Update", msg) == QMessageBox.Yes:
+            msg = f"¡Versión {remote} disponible! (Actual: {local})\n\n¿Desea actualizar automáticamente?"
+            reply = QMessageBox.question(self, "Update Available", msg, 
+                                         QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            
+            if reply == QMessageBox.Yes:
+                self.start_auto_update(remote)
+            elif reply == QMessageBox.No:
                 import webbrowser
                 webbrowser.open("https://github.com/l337quez/GNU-MAU")
         else:
             QMessageBox.information(self, "Update", f"You're up to date ({local}).")
-            self.status_text.append("Updated system.")
+            self.status_text.append("System is up to date.")
+
+    def start_auto_update(self, version):
+        self.status_text.append(f"Searching for update package for version {version}...")
+        self.progress_bar.start(text="Finding Update")
+        
+        api_url = "https://api.github.com/repos/l337quez/GNU-MAU/contents/last_version?ref=main"
+        
+        import re
+        parts = re.findall(r'\d+', version)
+        v_nums = ".".join(parts)
+        
+        self.discovery_thread = DiscoveryThread(api_url, v_nums)
+        self.discovery_thread.finished.connect(lambda info: self.download_target(info, version))
+        self.discovery_thread.error.connect(self.on_download_error)
+        self.discovery_thread.start()
+
+    def download_target(self, file_info, version):
+        file_name = file_info['name']
+        download_url = file_info['download_url']
+        
+        self.status_text.append(f"Found: {file_name}. Downloading...")
+        self.progress_bar.start(text="Downloading Update")
+        
+        if not hasattr(self, 'temp_dir'):
+            self.temp_dir = tempfile.mkdtemp()
+            
+        extension = ".rar" if file_name.lower().endswith(".rar") else ".zip"
+        self.download_path = os.path.join(self.temp_dir, f"update_{version}{extension}")
+        
+        self.download_thread = DownloadThread(download_url, self.download_path)
+        self.download_thread.progress.connect(self.progress_bar.update_progress)
+        self.download_thread.finished.connect(lambda path: self.start_extraction(path, version))
+        self.download_thread.error.connect(self.on_download_error)
+        self.download_thread.start()
+
+    def start_extraction(self, archive_path, version):
+        self.status_text.append("Extracting update...")
+        self.progress_bar.set_text("Extracting Update")
+        
+        self.extraction_thread = ExtractionThread(archive_path, self.temp_dir)
+        self.extraction_thread.finished.connect(lambda path: self.on_extraction_finished(path, version))
+        self.extraction_thread.error.connect(lambda err: self.on_extraction_error(err, archive_path))
+        self.extraction_thread.start()
+
+    def on_extraction_finished(self, new_internal, version):
+        self.status_text.append("Update extracted. Preparing installation...")
+        self.run_auto_install_script(new_internal, version)
+
+    def on_extraction_error(self, error, archive_path):
+        self.status_text.append(f"Extraction Error: {error}")
+        if archive_path.lower().endswith(".rar"):
+            self.status_text.append("TIP: Use .zip instead of .rar for automatic extraction.")
+        self.progress_bar.reset()
+        QMessageBox.critical(self, "Update Error", f"Failed to extract update: {error}")
+
+
+    def on_download_error(self, error):
+        self.status_text.append(f"Update Error: {error}")
+        self.progress_bar.reset()
+        QMessageBox.critical(self, "Update Error", f"Failed to process update: {error}")
+
+
+    def handle_extracted_file(self, path, version):
+        # Deprecated: now handled by start_extraction
+        self.start_extraction(path, version)
+
+    def run_auto_install_script(self, new_internal, version):
+        if getattr(sys, 'frozen', False):
+            base_path = os.path.dirname(sys.executable)
+            exe_path = sys.executable
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+            exe_path = sys.argv[0]
+
+        dest_internal = os.path.join(base_path, "_internal")
+        batch_path = os.path.join(base_path, "update_data.bat")
+        
+        storage_src = os.path.join(new_internal, "storage")
+        storage_dest = os.path.join(dest_internal, "storage")
+        mongita_src = os.path.join(new_internal, "mongita_data")
+        mongita_dest = os.path.join(dest_internal, "mongita_data")
+        
+        # We also want to update version.txt
+        # Try to find version.txt in the extracted package
+        version_src = None
+        for root, dirs, files in os.walk(os.path.dirname(new_internal)):
+            if "version.txt" in files:
+                version_src = os.path.join(root, "version.txt")
+                break
+        
+        version_dest = os.path.join(base_path, "version.txt")
+
+        batch_content = f"""
+        @echo off
+        timeout /t 2 /nobreak > nul
+        if exist "{storage_dest}" rd /s /q "{storage_dest}"
+        if exist "{mongita_dest}" rd /s /q "{mongita_dest}"
+        if exist "{storage_src}" xcopy "{storage_src}" "{storage_dest}" /e /i /y
+        if exist "{mongita_src}" xcopy "{mongita_src}" "{mongita_dest}" /e /i /y
+        if exist "{version_src}" copy /y "{version_src}" "{version_dest}"
+        start "" "{exe_path}"
+        del "%~f0"
+        """
+        
+        try:
+            with open(batch_path, "w") as f:
+                f.write(batch_content)
+
+            QMessageBox.information(
+                self,
+                "Update Ready",
+                "The update has been downloaded and prepared. The application will restart to complete the installation."
+            )
+
+            import subprocess
+            popen_args = {"shell": True}
+            if is_windows():
+                popen_args["creationflags"] = 0x00000010 
+            
+            subprocess.Popen([batch_path], **popen_args)
+            sys.exit(0)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Update Error", f"Failed to prepare installation: {e}")
 
     @Slot(str)
     def on_update_error(self, error_msg):

@@ -54,7 +54,7 @@ class Pacman:
         if self.step > self.len:
             self.step = self.len
         self._draw()
-        time.sleep(0.1)  # Añadir una pausa para ver la animación
+
 
     def progress(self, value):
         self.step = float(value)

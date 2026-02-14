@@ -202,7 +202,10 @@ class MainWindow(QMainWindow):
 
     def add_create_project_button(self):
         create_project_button = QPushButton("Create Project")
-        create_project_button.setStyleSheet("padding: 4px; margin: 8px;")
+        create_project_button.setMaximumSize(24, 24)
+        create_project_button.setStyleSheet("padding: 4px; margin: 4px;")
+        create_project_button.setFixedWidth(110)
+
         size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         create_project_button.setSizePolicy(size_policy)
         create_project_button.clicked.connect(self.show_create_project_form)
