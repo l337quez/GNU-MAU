@@ -548,22 +548,27 @@ class SettingTab(QWidget):
         # Backup folder path
         backup_dir = os.path.join(base_path, "backup_before_update")
         
-        # Paths for specific critical data
-        # We'll check both root and _internal for safety
-        def find_data_path(name, default_parent):
-            root_path = os.path.join(base_path, name)
-            internal_path = os.path.join(default_parent, name)
-            if os.path.exists(root_path): return root_path
-            if os.path.exists(internal_path): return internal_path
-            return internal_path # Default to _internal if neither found
-
-        storage_dest = find_data_path("storage", dest_internal)
-        mongita_dest = find_data_path("mongita_data", dest_internal)
+        # Data destination paths: STRICTLY match main.py logic
+        # If frozen (EXE), data goes inside _internal
+        if getattr(sys, 'frozen', False):
+            storage_dest = os.path.join(dest_internal, "storage")
+            mongita_dest = os.path.join(dest_internal, "mongita_data")
+        else:
+            storage_dest = os.path.join(base_path, "storage")
+            mongita_dest = os.path.join(base_path, "mongita_data")
         
-        storage_src = os.path.join(new_internal, "storage")
+        # Source paths in the update package
+        def find_src_path(name, extracted_internal):
+            internal_src = os.path.join(extracted_internal, name)
+            root_src = os.path.join(os.path.dirname(extracted_internal), name)
+            if os.path.exists(internal_src): return internal_src
+            if os.path.exists(root_src): return root_src
+            return internal_src # Default
+
+        storage_src = find_src_path("storage", new_internal)
         storage_backup = os.path.join(backup_dir, "storage")
         
-        mongita_src = os.path.join(new_internal, "mongita_data")
+        mongita_src = find_src_path("mongita_data", new_internal)
         mongita_backup = os.path.join(backup_dir, "mongita_data")
         
         # Find version.txt
@@ -586,66 +591,66 @@ class SettingTab(QWidget):
         
         batch_content = f"""
         @echo off
-        timeout /t 3 /nobreak > nul
-        
-        :: 1. Create backup folder if not exists
-        if not exist "{backup_dir}" mkdir "{backup_dir}"
+        set "LOG_FILE=%~dp0update_log.txt"
+        echo --- GNU MAU UPDATE LOG [%date% %time%] --- > "%LOG_FILE%"
 
-        :: 2. Backup existing data
-        :: Handling storage
+        :: 1. Kill entire process tree
+        echo STEP 1: Killing processes... >> "%LOG_FILE%" 2>&1
+        taskkill /f /t /im "GNU Mau.exe" >> "%LOG_FILE%" 2>&1
+        taskkill /f /t /im python.exe >> "%LOG_FILE%" 2>&1
+        
+        echo STEP 2: Waiting for release... >> "%LOG_FILE%" 2>&1
+        timeout /t 5 /nobreak > nul
+        
+        :: 2. Create backup folder
+        if not exist "{backup_dir}" mkdir "{backup_dir}" >> "%LOG_FILE%" 2>&1
+
+        :: 3. Backup (Use robocopy for robustness)
+        echo STEP 3: Backing up current data... >> "%LOG_FILE%" 2>&1
         if exist "{storage_dest}" (
-            echo Backing up storage...
-            if exist "{storage_backup}" rd /s /q "{storage_backup}"
-            move "{storage_dest}" "{storage_backup}"
+            robocopy "{storage_dest}" "{storage_backup}" /E /MOVE /R:3 /W:1 >> "%LOG_FILE%" 2>&1
         )
-        
-        :: Handling mongita_data (Explicitly check for existence)
         if exist "{mongita_dest}" (
-            echo Backing up mongita_data...
-            if exist "{mongita_backup}" rd /s /q "{mongita_backup}"
-            move "{mongita_dest}" "{mongita_backup}"
+            robocopy "{mongita_dest}" "{mongita_backup}" /E /MOVE /R:3 /W:1 >> "%LOG_FILE%" 2>&1
         )
 
-        :: 3. Delete old _internal and copy the new one
-        :: We only delete if it exists, and handle it carefully
-        if exist "{dest_internal}" (
-            echo Cleaning old _internal...
-            rd /s /q "{dest_internal}"
-        )
+        :: 4. Update Core files
+        echo STEP 4: Updating application files... >> "%LOG_FILE%" 2>&1
+        if exist "{dest_internal}" rd /s /q "{dest_internal}" >> "%LOG_FILE%" 2>&1
+        mkdir "{dest_internal}" >> "%LOG_FILE%" 2>&1
+        xcopy "{new_internal}" "{dest_internal}" /s /e /i /y >> "%LOG_FILE%" 2>&1
+
+        :: 5. RESTORATION (CRITICAL)
+        echo STEP 5: Restoring user data... >> "%LOG_FILE%" 2>&1
         
-        echo Copying new _internal...
-        mkdir "{dest_internal}"
-        xcopy "{new_internal}" "{dest_internal}" /s /e /i /y
-
-        :: 4. Intelligent Restore Logic
-        
-        :: Check storage: if no new storage in ZIP, bring back the backup
-        if not exist "{storage_src}" (
-            if exist "{storage_backup}" (
-                echo Restoring storage from backup...
-                move "{storage_backup}" "{storage_dest}"
-            )
+        :: Prioritize Backup
+        if exist "{storage_backup}" (
+            echo - Applying storage backup... >> "%LOG_FILE%" 2>&1
+            if exist "{storage_dest}" rd /s /q "{storage_dest}" >> "%LOG_FILE%" 2>&1
+            robocopy "{storage_backup}" "{storage_dest}" /E /MOVE /R:3 /W:1 >> "%LOG_FILE%" 2>&1
         ) else (
-            echo Using new storage from update...
-            xcopy "{storage_src}" "{storage_dest}" /s /e /i /y
+            if exist "{storage_src}" (
+                echo - Using fresh storage from update... >> "%LOG_FILE%" 2>&1
+                robocopy "{storage_src}" "{storage_dest}" /E /MOVE /R:3 /W:1 >> "%LOG_FILE%" 2>&1
+            )
         )
 
-        :: Check mongita_data: if no new data in ZIP, bring back the backup
-        if not exist "{mongita_src}" (
-            if exist "{mongita_backup}" (
-                echo Restoring mongita_data from backup...
-                move "{mongita_backup}" "{mongita_dest}"
-            )
+        if exist "{mongita_backup}" (
+            echo - Applying database backup... >> "%LOG_FILE%" 2>&1
+            if exist "{mongita_dest}" rd /s /q "{mongita_dest}" >> "%LOG_FILE%" 2>&1
+            robocopy "{mongita_backup}" "{mongita_dest}" /E /MOVE /R:3 /W:1 >> "%LOG_FILE%" 2>&1
         ) else (
-            echo Using new mongita_data from update...
-            xcopy "{mongita_src}" "{mongita_dest}" /s /e /i /y
+            if exist "{mongita_src}" (
+                echo - Using fresh database from update... >> "%LOG_FILE%" 2>&1
+                robocopy "{mongita_src}" "{mongita_dest}" /E /MOVE /R:3 /W:1 >> "%LOG_FILE%" 2>&1
+            )
         )
 
-        :: 5. Update version file
-        if exist "{version_src}" copy /y "{version_src}" "{version_dest}"
+        :: 6. Version and Cleanup
+        echo STEP 6: Finalizing... >> "%LOG_FILE%" 2>&1
+        if exist "{version_src}" copy /y "{version_src}" "{version_dest}" >> "%LOG_FILE%" 2>&1
 
-        :: 6. Restart the application
-        echo Restarting application...
+        echo SUCCESS: Update completed. Restarting. >> "%LOG_FILE%" 2>&1
         start "" "{exe_path}"
         del "%~f0"
         """
