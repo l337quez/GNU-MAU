@@ -72,3 +72,8 @@
 - Add optinon browser in project info tab.
 - Add changes style for buttons in project info tab.
 
+#### ⟳ Changelog Beta version 0.2.9 (2026-02-14)
+- Add progress bar for backup and restore database.
+- New version 0.2.9
+- fix automatic restore database and store when update version 
+

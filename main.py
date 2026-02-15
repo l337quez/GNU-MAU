@@ -7,6 +7,7 @@ from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer
 from PySide6.QtWidgets import QSizePolicy
 import json, sys, os
+from bson.objectid import ObjectId
 from dotenv import load_dotenv
 # Mau resources
 from about_tab import AboutTab
@@ -283,7 +284,14 @@ class MainWindow(QMainWindow):
             self.show_create_project_form()
             return 
 
-        project = self.db.projects.find_one({"_id": project_id})
+        # Convert to ObjectId for querying
+        try:
+            p_id = ObjectId(project_id) if isinstance(project_id, str) else project_id
+            project = self.db.projects.find_one({"_id": p_id})
+        except Exception as e:
+            print(f"Error querying project: {e}")
+            project = None
+
         if not project:
             return
 

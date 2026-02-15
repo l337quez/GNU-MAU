@@ -34,7 +34,7 @@ class CustomProgressBar(QWidget):
         self.show()
         self.pacman = Pacman(self.progress_label, start=start, end=end, width=35, text=text, candy_count=candy_count)
     
-    def update_progress(self, value=1):
+    def update_progress(self, value=0.5):
         if self.pacman:
             self.pacman.update(value)
             if self.pacman.step >= self.pacman.end:

@@ -88,23 +88,15 @@ class DiscoveryThread(QThread):
                 files_json = json.loads(response.read().decode('utf-8'))
                 
                 target_file = None
-                # First pass: look for .zip
                 for f in files_json:
                     if f['type'] == 'file' and self.v_nums in f['name'] and f['name'].lower().endswith('.zip'):
                         target_file = f
                         break
                 
-                # Second pass: look for any file (like .rar) if no .zip found
-                if not target_file:
-                    for f in files_json:
-                        if f['type'] == 'file' and self.v_nums in f['name']:
-                            target_file = f
-                            break
-                
                 if target_file:
                     self.finished.emit(target_file)
                 else:
-                    self.error.emit(f"Could not find any file containing '{self.v_nums}'")
+                    self.error.emit(f"Compatible update (.zip) not found for version {self.v_nums}.")
         except Exception as e:
             self.error.emit(str(e))
 
@@ -228,11 +220,6 @@ class SettingTab(QWidget):
 
         db_group.setLayout(db_group_v_layout)
         self.info_layout.addWidget(db_group)
-
-        self.animate_button = QPushButton("Animation Start")
-        self.animate_button.setFixedWidth(140) 
-        self.animate_button.clicked.connect(self.start_animation)
-        self.info_layout.addWidget(self.animate_button)
 
         self.check_update_btn = QPushButton("Find Updates")
         self.check_update_btn.setFixedWidth(140) 
@@ -433,19 +420,6 @@ class SettingTab(QWidget):
         
 
     @Slot()
-    def start_animation(self):
-        self.progress_bar.start(start=0, end=100, text="Progress", candy_count=35)
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_pacman)
-        self.timer.start(100)
-
-    @Slot()
-    def update_pacman(self):
-        self.progress_bar.update_progress(1)
-        if self.progress_bar.pacman and self.progress_bar.pacman.step >= self.progress_bar.pacman.end:
-            self.timer.stop()
-
-    @Slot()
     def on_backup_finished(self):
         self.status_text.append("Respaldo completado.")
         self.timer.stop()
@@ -534,6 +508,13 @@ class SettingTab(QWidget):
         self.download_thread.error.connect(self.on_download_error)
         self.download_thread.start()
 
+    def on_download_error(self, error):
+        self.status_text.append(f"Update Error: {error}")
+        self.progress_bar.reset()
+        QMessageBox.critical(self, "Update Error", f"Failed to process update: {error}")
+
+
+
     def start_extraction(self, archive_path, version):
         self.status_text.append("Extracting update...")
         self.progress_bar.set_text("Extracting Update")
@@ -549,21 +530,9 @@ class SettingTab(QWidget):
 
     def on_extraction_error(self, error, archive_path):
         self.status_text.append(f"Extraction Error: {error}")
-        if archive_path.lower().endswith(".rar"):
-            self.status_text.append("TIP: Use .zip instead of .rar for automatic extraction.")
         self.progress_bar.reset()
         QMessageBox.critical(self, "Update Error", f"Failed to extract update: {error}")
 
-
-    def on_download_error(self, error):
-        self.status_text.append(f"Update Error: {error}")
-        self.progress_bar.reset()
-        QMessageBox.critical(self, "Update Error", f"Failed to process update: {error}")
-
-
-    def handle_extracted_file(self, path, version):
-        # Deprecated: now handled by start_extraction
-        self.start_extraction(path, version)
 
     def run_auto_install_script(self, new_internal, version):
         if getattr(sys, 'frozen', False):
@@ -574,31 +543,109 @@ class SettingTab(QWidget):
             exe_path = sys.argv[0]
 
         dest_internal = os.path.join(base_path, "_internal")
-        batch_path = os.path.join(base_path, "update_data.bat")
+        batch_path = os.path.join(base_path, "auto_update.bat")
+        
+        # Backup folder path
+        backup_dir = os.path.join(base_path, "backup_before_update")
+        
+        # Paths for specific critical data
+        # We'll check both root and _internal for safety
+        def find_data_path(name, default_parent):
+            root_path = os.path.join(base_path, name)
+            internal_path = os.path.join(default_parent, name)
+            if os.path.exists(root_path): return root_path
+            if os.path.exists(internal_path): return internal_path
+            return internal_path # Default to _internal if neither found
+
+        storage_dest = find_data_path("storage", dest_internal)
+        mongita_dest = find_data_path("mongita_data", dest_internal)
         
         storage_src = os.path.join(new_internal, "storage")
-        storage_dest = os.path.join(dest_internal, "storage")
-        mongita_src = os.path.join(new_internal, "mongita_data")
-        mongita_dest = os.path.join(dest_internal, "mongita_data")
+        storage_backup = os.path.join(backup_dir, "storage")
         
-        # We also want to update version.txt
-        # Try to find version.txt in the extracted package
+        mongita_src = os.path.join(new_internal, "mongita_data")
+        mongita_backup = os.path.join(backup_dir, "mongita_data")
+        
+        # Find version.txt
         version_src = None
-        for root, dirs, files in os.walk(os.path.dirname(new_internal)):
-            if "version.txt" in files:
-                version_src = os.path.join(root, "version.txt")
+        search_dirs = [os.path.dirname(new_internal), new_internal]
+        for sdir in search_dirs:
+            v_path = os.path.join(sdir, "version.txt")
+            if os.path.exists(v_path):
+                version_src = v_path
                 break
         
         version_dest = os.path.join(base_path, "version.txt")
 
+        # The script will:
+        # 1. Backup current data
+        # 2. Update core files
+        # 3. Intelligent data restore:
+        #    - If ZIP has NO storage, move backup back to dest.
+        #    - If ZIP HAS storage, it stays in dest (Restoration), and backup remains safe.
+        
         batch_content = f"""
         @echo off
-        timeout /t 2 /nobreak > nul
-        if exist "{storage_dest}" rd /s /q "{storage_dest}"
-        if exist "{mongita_dest}" rd /s /q "{mongita_dest}"
-        if exist "{storage_src}" xcopy "{storage_src}" "{storage_dest}" /e /i /y
-        if exist "{mongita_src}" xcopy "{mongita_src}" "{mongita_dest}" /e /i /y
+        timeout /t 3 /nobreak > nul
+        
+        :: 1. Create backup folder if not exists
+        if not exist "{backup_dir}" mkdir "{backup_dir}"
+
+        :: 2. Backup existing data
+        :: Handling storage
+        if exist "{storage_dest}" (
+            echo Backing up storage...
+            if exist "{storage_backup}" rd /s /q "{storage_backup}"
+            move "{storage_dest}" "{storage_backup}"
+        )
+        
+        :: Handling mongita_data (Explicitly check for existence)
+        if exist "{mongita_dest}" (
+            echo Backing up mongita_data...
+            if exist "{mongita_backup}" rd /s /q "{mongita_backup}"
+            move "{mongita_dest}" "{mongita_backup}"
+        )
+
+        :: 3. Delete old _internal and copy the new one
+        :: We only delete if it exists, and handle it carefully
+        if exist "{dest_internal}" (
+            echo Cleaning old _internal...
+            rd /s /q "{dest_internal}"
+        )
+        
+        echo Copying new _internal...
+        mkdir "{dest_internal}"
+        xcopy "{new_internal}" "{dest_internal}" /s /e /i /y
+
+        :: 4. Intelligent Restore Logic
+        
+        :: Check storage: if no new storage in ZIP, bring back the backup
+        if not exist "{storage_src}" (
+            if exist "{storage_backup}" (
+                echo Restoring storage from backup...
+                move "{storage_backup}" "{storage_dest}"
+            )
+        ) else (
+            echo Using new storage from update...
+            xcopy "{storage_src}" "{storage_dest}" /s /e /i /y
+        )
+
+        :: Check mongita_data: if no new data in ZIP, bring back the backup
+        if not exist "{mongita_src}" (
+            if exist "{mongita_backup}" (
+                echo Restoring mongita_data from backup...
+                move "{mongita_backup}" "{mongita_dest}"
+            )
+        ) else (
+            echo Using new mongita_data from update...
+            xcopy "{mongita_src}" "{mongita_dest}" /s /e /i /y
+        )
+
+        :: 5. Update version file
         if exist "{version_src}" copy /y "{version_src}" "{version_dest}"
+
+        :: 6. Restart the application
+        echo Restarting application...
         start "" "{exe_path}"
         del "%~f0"
         """
@@ -610,7 +657,7 @@ class SettingTab(QWidget):
             QMessageBox.information(
                 self,
                 "Update Ready",
-                "The update has been downloaded and prepared. The application will restart to complete the installation."
+                "The update has been downloaded and prepared. The application will restart to complete the installation and a backup of your data has been created in 'backup_before_update'."
             )
 
             import subprocess
@@ -623,6 +670,8 @@ class SettingTab(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Update Error", f"Failed to prepare installation: {e}")
+
+
 
     @Slot(str)
     def on_update_error(self, error_msg):
