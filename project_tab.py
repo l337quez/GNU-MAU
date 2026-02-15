@@ -144,7 +144,7 @@ class ProjectTab(QWidget):
                 "icon_path": default_path 
             }
             result = projects_collection.insert_one(project_doc)
-            self.main_window.current_project_id = result.inserted_id
+            self.main_window.current_project_id = str(result.inserted_id)
             
             # Crear item en lista
             new_item = QListWidgetItem(f"{project_name}: {project_description[:8]}...")
@@ -159,8 +159,11 @@ class ProjectTab(QWidget):
         
         # Caso: Proyecto Existente
         else:
+            p_id = self.main_window.current_project_id
+            if isinstance(p_id, str): p_id = ObjectId(p_id)
+            
             projects_collection.update_one(
-                {"_id": self.main_window.current_project_id},
+                {"_id": p_id},
                 {"$set": {
                     "name": project_name,
                     "description": project_description,
@@ -168,6 +171,10 @@ class ProjectTab(QWidget):
                 }}
             )
             
+            # Sincronizar metadatos en main_window
+            self.main_window.current_project_name = project_name
+            self.main_window.current_project_description = project_description
+
             # Actualizar solo el texto del item
             self.main_window.current_project_item.setText(f"{project_name}: {project_description[:8]}...")
 

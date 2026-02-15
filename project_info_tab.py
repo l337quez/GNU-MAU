@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QHBoxLay
 from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
+from bson.objectid import ObjectId
 from utils import get_resource_path, open_system_terminal, open_browser, is_windows
 
 class ProjectInfoTab(QWidget):
@@ -44,11 +45,10 @@ class ProjectInfoTab(QWidget):
         self.info_layout.addLayout(self.info_form_layout)
 
         self.additional_info_table = QTableWidget(0, 3)
-        self.additional_info_table.setHorizontalHeaderLabels(["Key", "Actions", "Value"])
+        self.additional_info_table.setHorizontalHeaderLabels(["Key", "Value", "Actions"])
         self.additional_info_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.additional_info_table.setAlternatingRowColors(True)
         self.additional_info_table.verticalHeader().setVisible(False)
-
         self.additional_info_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
 
         self.info_layout.addWidget(self.additional_info_table)
@@ -83,12 +83,12 @@ class ProjectInfoTab(QWidget):
         
         key_item = QTableWidgetItem(key)
         key_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-        key_item.setData(Qt.UserRole, key)  # Guardar el valor original del key
+        key_item.setData(Qt.UserRole, key)
         self.additional_info_table.setItem(row_position, 0, key_item)
         
         value_item = QTableWidgetItem(value)
         value_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-        self.additional_info_table.setItem(row_position, 2, value_item)
+        self.additional_info_table.setItem(row_position, 1, value_item)
         
         actions_widget = QWidget()
         actions_layout = QHBoxLayout()
@@ -105,13 +105,13 @@ class ProjectInfoTab(QWidget):
         delete_button = QPushButton()
         delete_button.setIcon(QIcon(get_resource_path("assets/icons/delete.png")))
         delete_button.setMaximumSize(24, 24)
-        delete_button.clicked.connect(lambda: self.delete_row(row_position))
+        delete_button.clicked.connect(self.on_delete_clicked)
         actions_layout.addWidget(delete_button)
 
         save_button = QPushButton()
         save_button.setIcon(QIcon(get_resource_path("assets/icons/save.png")))
         save_button.setMaximumSize(24, 24)
-        save_button.clicked.connect(lambda: self.save_row(row_position))
+        save_button.clicked.connect(self.on_save_clicked)
         actions_layout.addWidget(save_button)
 
         if action == "terminal":
@@ -133,17 +133,42 @@ class ProjectInfoTab(QWidget):
             web_btn.clicked.connect(lambda: open_browser(value))
             actions_layout.addWidget(web_btn)
 
-        self.additional_info_table.setCellWidget(row_position, 1, actions_widget)
+        self.additional_info_table.setCellWidget(row_position, 2, actions_widget)
+
+    @Slot()
+    def on_delete_clicked(self):
+        button = self.sender()
+        if button:
+            from PySide6.QtCore import QPoint
+            # Map point to the table's viewport for accurate index detection
+            pos = button.mapTo(self.additional_info_table.viewport(), QPoint(0, 0))
+            index = self.additional_info_table.indexAt(pos)
+            if index.isValid():
+                self.delete_row(index.row())
+
+    @Slot()
+    def on_save_clicked(self):
+        button = self.sender()
+        if button:
+            from PySide6.QtCore import QPoint
+            pos = button.mapTo(self.additional_info_table.viewport(), QPoint(0, 0))
+            index = self.additional_info_table.indexAt(pos)
+            if index.isValid():
+                self.save_row(index.row())
 
     @Slot()
     def save_row(self, row_position):
         key_item = self.additional_info_table.item(row_position, 0)
-        value_item = self.additional_info_table.item(row_position, 2)
+        value_item = self.additional_info_table.item(row_position, 1)
         
         if key_item and value_item:
             old_key = key_item.data(Qt.UserRole)  # Obtén el key original antes de la edición
             new_key = key_item.text()
             value = value_item.text()
+
+            # Asegurar que current_project_info existe
+            if not hasattr(self.main_window, 'current_project_info'):
+                self.main_window.current_project_info = {}
 
             if old_key != new_key:  # Si el key ha cambiado
                 # Actualiza el diccionario del proyecto
@@ -166,8 +191,11 @@ class ProjectInfoTab(QWidget):
 
             # Actualiza la base de datos
             projects_collection = self.main_window.db.projects
+            p_id = self.main_window.current_project_id
+            if isinstance(p_id, str): p_id = ObjectId(p_id)
+
             projects_collection.update_one(
-                {"name": self.main_window.current_project_name, "description": self.main_window.current_project_description},
+                {"_id": p_id},
                 {"$set": {
                     "info": self.main_window.current_project_info
                 }}
@@ -175,6 +203,7 @@ class ProjectInfoTab(QWidget):
 
             # Actualiza el key original almacenado en UserRole para futuras ediciones
             key_item.setData(Qt.UserRole, new_key)
+            self.main_window.statusBar().showMessage(f"Key '{new_key}' saved successfully!", 2000)
 
     @Slot()
     def enable_editing(self):
@@ -208,8 +237,12 @@ class ProjectInfoTab(QWidget):
         if icon_path:
             self.main_window.current_project_item.setIcon(QIcon(icon_path))
             projects_collection = self.main_window.db.projects
+            
+            p_id = self.main_window.current_project_id
+            if isinstance(p_id, str): p_id = ObjectId(p_id)
+
             result = projects_collection.update_one(
-                {"name": self.main_window.current_project_name, "description": self.main_window.current_project_description},
+                {"_id": p_id},
                 {"$set": {"icon_path": icon_path}}
             )
             print(f"Icon path updated: {result.modified_count} document(s) modified.")     
@@ -228,8 +261,11 @@ class ProjectInfoTab(QWidget):
             self.add_info_item(name, value, action_type)
 
             projects_collection = self.main_window.db.projects
+            p_id = self.main_window.current_project_id
+            if isinstance(p_id, str): p_id = ObjectId(p_id)
+
             projects_collection.update_one(
-                {"name": self.main_window.current_project_name, "description": self.main_window.current_project_description},
+                {"_id": p_id},
                 {"$set": {
                     "info": self.main_window.current_project_info
                 }}
@@ -251,11 +287,16 @@ class ProjectInfoTab(QWidget):
             key = key_item.text()
             if key in self.main_window.current_project_info:
                 del self.main_window.current_project_info[key]
+            
             projects_collection = self.main_window.db.projects
+            p_id = self.main_window.current_project_id
+            if isinstance(p_id, str): p_id = ObjectId(p_id)
+
             projects_collection.update_one(
-                {"name": self.main_window.current_project_name, "description": self.main_window.current_project_description},
+                {"_id": p_id},
                 {"$set": {
                     "info": self.main_window.current_project_info
                 }}
             )
             self.additional_info_table.removeRow(row_position)
+            self.main_window.statusBar().showMessage(f"Key '{key}' deleted.", 2000)
