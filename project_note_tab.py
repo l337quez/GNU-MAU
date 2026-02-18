@@ -107,7 +107,7 @@ class ProjectNoteTab(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("🔍 Search note...")
         self.search_input.setFixedHeight(28)
-        self.new_note_btn = QPushButton("📄 New") # Texto más corto
+        self.new_note_btn = QPushButton("📄 New note")
         self.new_note_btn.setFixedHeight(28)
         self.top_bar.addWidget(self.search_input)
         self.top_bar.addWidget(self.new_note_btn)

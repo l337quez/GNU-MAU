@@ -13,10 +13,9 @@ class ProjectInfoTab(QWidget):
         self.info_layout = QVBoxLayout()
 
         self.project_name_label = QLabel("Project name")
+        self.project_name_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 5px;")
         self.info_layout.addWidget(self.project_name_label)
 
-        self.project_description_label = QLabel("Project description")
-        self.info_layout.addWidget(self.project_description_label)
 
         buttons_layout = QHBoxLayout()
         self.search_input = QLineEdit()
@@ -24,6 +23,32 @@ class ProjectInfoTab(QWidget):
         self.search_input.returnPressed.connect(self.search_info)
         buttons_layout.addWidget(self.search_input)
         self.info_layout.addLayout(buttons_layout)
+
+        # Widget de confirmación de borrado
+        self.confirmation_widget = QWidget()
+        self.confirmation_widget.setVisible(False)
+        confirm_layout = QHBoxLayout(self.confirmation_widget)
+        confirm_layout.setContentsMargins(0, 5, 0, 5)
+        
+        self.confirm_label = QLabel("Are you sure delete this record?")
+        self.confirm_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        
+        self.confirm_yes_btn = QPushButton("Delete")
+        self.confirm_yes_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px 10px;")
+        self.confirm_yes_btn.clicked.connect(self.confirm_deletion)
+        
+        self.confirm_no_btn = QPushButton("Cancel")
+        self.confirm_no_btn.setStyleSheet("padding: 5px 10px;")
+        self.confirm_no_btn.clicked.connect(self.cancel_deletion)
+        
+        confirm_layout.addWidget(self.confirm_label)
+        confirm_layout.addWidget(self.confirm_yes_btn)
+        confirm_layout.addWidget(self.confirm_no_btn)
+        confirm_layout.addStretch()
+        
+        self.info_layout.addWidget(self.confirmation_widget)
+        
+        self.row_to_delete = -1
 
         self.info_form_layout = QHBoxLayout()
         self.info_name_input = QLineEdit()
@@ -58,8 +83,8 @@ class ProjectInfoTab(QWidget):
 
 
     def update_project_info(self, name, description, info):
-        self.project_name_label.setText(f"Name: {name}")
-        self.project_description_label.setText(f"Description: {description}")
+        self.project_name_label.setText(f"Project: {name}")
+        # self.project_description_label.setText(f"Description: {description}")
         self.clear_table()
         info_dict = info if isinstance(info, dict) else {}
         for key, info_item in info_dict.items():
@@ -99,7 +124,7 @@ class ProjectInfoTab(QWidget):
         copy_button = QPushButton()
         copy_button.setIcon(QIcon(get_resource_path("assets/icons/icon_copy.png")))
         copy_button.setMaximumSize(24, 24)
-        copy_button.clicked.connect(lambda: self.copy_to_clipboard(value))
+        copy_button.clicked.connect(lambda k=key, v=value: self.copy_to_clipboard(k, v))
         actions_layout.addWidget(copy_button)
 
         delete_button = QPushButton()
@@ -144,7 +169,22 @@ class ProjectInfoTab(QWidget):
             pos = button.mapTo(self.additional_info_table.viewport(), QPoint(0, 0))
             index = self.additional_info_table.indexAt(pos)
             if index.isValid():
-                self.delete_row(index.row())
+                self.row_to_delete = index.row()
+                key_item = self.additional_info_table.item(self.row_to_delete, 0)
+                key_text = key_item.text() if key_item else "this record"
+                self.confirm_label.setText(f"Are you sure delete {key_text}?")
+                self.confirmation_widget.setVisible(True)
+
+    @Slot()
+    def confirm_deletion(self):
+        if self.row_to_delete >= 0:
+            self.delete_row(self.row_to_delete)
+        self.cancel_deletion()
+
+    @Slot()
+    def cancel_deletion(self):
+        self.row_to_delete = -1
+        self.confirmation_widget.setVisible(False)
 
     @Slot()
     def on_save_clicked(self):
@@ -275,10 +315,12 @@ class ProjectInfoTab(QWidget):
             self.info_value_input.clear()
             self.action_selector.setCurrentIndex(0)
 
-    @Slot()
-    def copy_to_clipboard(self, text):
+    @Slot(str, str)
+    def copy_to_clipboard(self, key, value):
         clipboard = QApplication.clipboard()
-        clipboard.setText(text)
+        clipboard.setText(value)
+        if hasattr(self.main_window, 'statusBar'):
+            self.main_window.statusBar().showMessage(f"Copied key '{key}' successfully!", 2000)
 
     @Slot()
     def delete_row(self, row_position):
