@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                                QDockWidget, QListWidgetItem, QPushButton)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer
-from PySide6.QtWidgets import QSizePolicy
+from PySide6.QtWidgets import QSizePolicy, QStackedWidget
 import json, sys, os
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
@@ -108,19 +108,26 @@ class MainWindow(QMainWindow):
             })
 
         self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
+        # self.setCentralWidget(self.tabs) # Will use stacked widget instead
+        
         self.project_tab = ProjectTab(self)
         self.project_info_tab = ProjectInfoTab(self)
         self.project_todo_tab = ProjectTodoTab(self, project_id=self.current_project_id)
         self.project_note_tab = ProjectNoteTab(self)
         self.setting_tab = SettingTab(self)
         self.about_tab = AboutTab(self)
+        
         self.tabs.addTab(self.project_tab, "Project")
         self.tabs.addTab(self.project_info_tab, "Information")
         self.tabs.addTab(self.project_todo_tab, "Todo")
         self.tabs.addTab(self.project_note_tab, "Note")
         self.tabs.addTab(self.setting_tab, "Setting")
         self.tabs.addTab(self.about_tab, "About")
+
+        # Stacked Widget for clean switching
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.addWidget(self.tabs)
+        self.setCentralWidget(self.stacked_widget)
 
         self.project_list_widget = QListWidget()
         self.project_list_widget.itemClicked.connect(self.display_project_info)
@@ -131,6 +138,27 @@ class MainWindow(QMainWindow):
         self.add_create_project_button()
 
         sidebar_layout = QVBoxLayout()
+        sidebar_layout.setContentsMargins(10, 10, 10, 10)
+        
+        # Navigation arrow (Switch back to projects icon/text)
+        self.back_to_projects_btn = QPushButton("⬅ Projects")
+        self.back_to_projects_btn.setVisible(False)
+        self.back_to_projects_btn.setFixedHeight(35)
+        self.back_to_projects_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                border-radius: 5px;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            QPushButton:hover {
+                background-color: #2ecc71;
+            }
+        """)
+        self.back_to_projects_btn.clicked.connect(self.show_project_tabs)
+
+        sidebar_layout.addWidget(self.back_to_projects_btn)
         sidebar_layout.addWidget(scroll_area)
 
         sidebar_widget = QWidget()
@@ -200,6 +228,8 @@ class MainWindow(QMainWindow):
             print("Mongita: Colección 'projects' creada automáticamente al primer insert.")
         if 'todos' not in self.db.list_collection_names():
             print("Mongita: Colección 'todos' creada automáticamente al primer insert.")
+        if 'categories' not in self.db.list_collection_names():
+            print("Mongita: Colección 'categories' creada automáticamente al primer insert.")
 
     def add_create_project_button(self):
         create_project_button = QPushButton("Create Project")
@@ -258,7 +288,8 @@ class MainWindow(QMainWindow):
                 self.gif_labels.append((item, gif_label))
                 item.setIcon(QIcon(gif_label.currentPixmap()))
             else:
-                item.setIcon(QIcon(icon_path))
+                resolved = get_resource_path(icon_path)
+                item.setIcon(QIcon(resolved))
             
             item.icon_path = icon_path
             self.project_list_widget.addItem(item)
@@ -318,13 +349,21 @@ class MainWindow(QMainWindow):
             gif_label = GIFLabel(icon_path)
             icon = QIcon(gif_label.currentPixmap())
         else:
-            icon = QIcon(icon_path)
+            icon = QIcon(get_resource_path(icon_path))
         self.current_project_item.setIcon(icon)
 
         #self.project_todo_tab.project_id = self.current_project_id
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_note_tab.set_project_id(self.current_project_id)
+
+        # Sincronizar filtro de categories en Information tab (desde info items)
+        info = project.get("info", {})
+        categories = sorted({
+            v.get("category", "") for v in info.values()
+            if isinstance(v, dict) and v.get("category", "")
+        })
+        self.project_info_tab.update_categories_filter(categories)
 
         self.project_info_tab.clear_search()
         self.tabs.setCurrentWidget(self.project_info_tab)
@@ -352,7 +391,7 @@ class MainWindow(QMainWindow):
                             self.gif_labels.append((item, gif_label))
                             item.setIcon(QIcon(gif_label.currentPixmap()))
                     else:
-                        item.setIcon(QIcon(icon_path))
+                        item.setIcon(QIcon(get_resource_path(icon_path)))
                     item.icon_path = icon_path 
                     break
 
@@ -385,6 +424,20 @@ class MainWindow(QMainWindow):
 
     def minimize_to_tray(self):
         self.hide()
+
+    @Slot()
+    def toggle_curl_view(self):
+        self.stacked_widget.setCurrentIndex(1)
+        self.curl_toggle_btn.setVisible(False)
+        self.back_to_projects_btn.setVisible(True)
+        self.statusBar().showMessage("Curl Wrapper view active", 2000)
+
+    @Slot()
+    def show_project_tabs(self):
+        self.stacked_widget.setCurrentIndex(0)
+        self.curl_toggle_btn.setVisible(True)
+        self.back_to_projects_btn.setVisible(False)
+        self.statusBar().showMessage("Returned to Projects", 2000)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -4,7 +4,7 @@ from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
 from bson.objectid import ObjectId
-from utils import get_resource_path, open_system_terminal, open_browser, is_windows
+from utils import get_resource_path, make_relative_path, open_system_terminal, open_browser, is_windows
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
@@ -22,6 +22,14 @@ class ProjectInfoTab(QWidget):
         self.search_input.setPlaceholderText("Search by key")
         self.search_input.returnPressed.connect(self.search_info)
         buttons_layout.addWidget(self.search_input)
+
+        # Filtro por categoría
+        self.category_filter = QComboBox()
+        self.category_filter.addItem("All categories")
+        self.category_filter.setFixedWidth(146)
+        self.category_filter.currentIndexChanged.connect(self.search_info)
+        buttons_layout.addWidget(self.category_filter)
+
         self.info_layout.addLayout(buttons_layout)
 
         # Widget de confirmación de borrado
@@ -57,7 +65,7 @@ class ProjectInfoTab(QWidget):
         self.info_value_input.setPlaceholderText("value")
         
         self.action_selector = QComboBox()
-        self.action_selector.addItems(["🚫 None", "💻 Terminal", "🌐 Browser"])
+        self.action_selector.addItems(["\U0001f6ab None", "\U0001f4bb Terminal", "\U0001f310 Browser"])
         self.action_selector.setFixedWidth(110)
 
         self.add_info_button = QPushButton("Add")
@@ -84,31 +92,30 @@ class ProjectInfoTab(QWidget):
 
     def update_project_info(self, name, description, info):
         self.project_name_label.setText(f"Project: {name}")
-        # self.project_description_label.setText(f"Description: {description}")
         self.clear_table()
         info_dict = info if isinstance(info, dict) else {}
         for key, info_item in info_dict.items():
             value = info_item["value"] if isinstance(info_item, dict) else info_item
-            
-            # Soporte compatibilidad
+            category = ""
             action = "none"
             if isinstance(info_item, dict):
+                category = info_item.get("category", "")
                 action = info_item.get("action")
                 if not action and info_item.get("terminal"):
                     action = "terminal"
-            
-            self.add_info_item(key, value, action)
+            self.add_info_item(key, value, action, category)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value, action=None):
+    def add_info_item(self, key, value, action=None, category=""):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         
         key_item = QTableWidgetItem(key)
         key_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-        key_item.setData(Qt.UserRole, key)
+        key_item.setData(Qt.UserRole, key)            # key original (para edición)
+        key_item.setData(Qt.UserRole + 1, category)  # categoría asignada
         self.additional_info_table.setItem(row_position, 0, key_item)
         
         value_item = QTableWidgetItem(value)
@@ -258,9 +265,20 @@ class ProjectInfoTab(QWidget):
     @Slot()
     def search_info(self):
         search_key = self.search_input.text().lower()
+        selected_cat = self.category_filter.currentText()
+        filter_by_cat = selected_cat != "All categories"
+
         for row in range(self.additional_info_table.rowCount()):
-            item = self.additional_info_table.item(row, 0)
-            if item and search_key in item.text().lower():
+            key_item = self.additional_info_table.item(row, 0)
+            key_match = (not search_key) or (key_item and search_key in key_item.text().lower())
+
+            if filter_by_cat:
+                stored_cat = key_item.data(Qt.UserRole + 1) if key_item else ""
+                cat_match = (stored_cat == selected_cat)
+            else:
+                cat_match = True
+
+            if key_match and cat_match:
                 self.additional_info_table.showRow(row)
             else:
                 self.additional_info_table.hideRow(row)
@@ -268,13 +286,25 @@ class ProjectInfoTab(QWidget):
     @Slot()
     def clear_search(self):
         self.search_input.clear()
+        self.category_filter.setCurrentIndex(0)
         for row in range(self.additional_info_table.rowCount()):
             self.additional_info_table.showRow(row)
+
+    def update_categories_filter(self, categories: list):
+        """Actualiza el combo filtro con las categories del proyecto."""
+        self.category_filter.blockSignals(True)
+        self.category_filter.clear()
+        self.category_filter.addItem("All categories")
+        for cat in sorted(categories):
+            self.category_filter.addItem(cat)
+        self.category_filter.blockSignals(False)
 
     @Slot()
     def change_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar Icono", "", "Imágenes PNG (*.png);;Imágenes GIF (*.gif);;Imágenes WebP (*.webp)")
         if icon_path:
+            # Convertir a ruta relativa para que sea portable
+            stored_path = make_relative_path(icon_path)
             self.main_window.current_project_item.setIcon(QIcon(icon_path))
             projects_collection = self.main_window.db.projects
             
@@ -283,7 +313,7 @@ class ProjectInfoTab(QWidget):
 
             result = projects_collection.update_one(
                 {"_id": p_id},
-                {"$set": {"icon_path": icon_path}}
+                {"$set": {"icon_path": stored_path}}
             )
             print(f"Icon path updated: {result.modified_count} document(s) modified.")     
 
@@ -296,9 +326,9 @@ class ProjectInfoTab(QWidget):
             idx = self.action_selector.currentIndex()
             action_type = [None, "terminal", "browser"][idx]
             
-            info_data = {"value": value, "action": action_type}
+            info_data = {"value": value, "action": action_type, "category": ""}
             self.main_window.current_project_info[name] = info_data
-            self.add_info_item(name, value, action_type)
+            self.add_info_item(name, value, action_type, "")
 
             projects_collection = self.main_window.db.projects
             p_id = self.main_window.current_project_id

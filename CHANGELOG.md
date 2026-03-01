@@ -81,3 +81,8 @@
 - Fix save key and value in project info tab.
 - Add new feacture, when delete key and value in project info tab, show a confirmation dialog.
 - New version 0.2.10 Beta
+
+#### ⟳ Changelog Beta version 0.2.11 (2026-03-01)
+- Fix bug in path gif and webp in project info tab.
+- Add categories summary in project info tab.
+- Fix bug in TODO tab when select item.
