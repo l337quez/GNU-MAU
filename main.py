@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                                QDockWidget, QListWidgetItem, QPushButton)
 from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer
-from PySide6.QtWidgets import QSizePolicy
+from PySide6.QtWidgets import QSizePolicy, QStackedWidget
 import json, sys, os
 from bson.objectid import ObjectId
 from dotenv import load_dotenv
@@ -17,6 +17,7 @@ from project_tab import ProjectTab
 from project_info_tab import ProjectInfoTab
 from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
+from tools import CurlWrapperTab
 from utils import get_resource_path, is_windows
 
 
@@ -108,7 +109,16 @@ class MainWindow(QMainWindow):
             })
 
         self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
+
+        # Stacked Widget for clean switching
+        self.stacked_widget = QStackedWidget()
+        self.stacked_widget.addWidget(self.tabs)
+        
+        self.tools_tab = CurlWrapperTab(self)
+        self.stacked_widget.addWidget(self.tools_tab)
+        
+        self.setCentralWidget(self.stacked_widget)
+        
         self.project_tab = ProjectTab(self)
         self.project_info_tab = ProjectInfoTab(self)
         self.project_todo_tab = ProjectTodoTab(self, project_id=self.current_project_id)
@@ -131,6 +141,27 @@ class MainWindow(QMainWindow):
         self.add_create_project_button()
 
         sidebar_layout = QVBoxLayout()
+        
+        # Tools Button
+        self.tools_button = QPushButton("🚀 Tools")
+        self.tools_button.setFixedHeight(35)
+        self.tools_button.setCursor(Qt.PointingHandCursor)
+        self.tools_button.setStyleSheet("""
+            QPushButton {
+                background-color: #34495e;
+                color: white;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+            QPushButton:hover {
+                background-color: #2c3e50;
+            }
+        """)
+        self.tools_button.clicked.connect(self.toggle_tools_view)
+        sidebar_layout.addWidget(self.tools_button)
+        
         sidebar_layout.addWidget(scroll_area)
 
         sidebar_widget = QWidget()
@@ -385,6 +416,43 @@ class MainWindow(QMainWindow):
 
     def minimize_to_tray(self):
         self.hide()
+
+    @Slot()
+    def toggle_tools_view(self):
+        if self.stacked_widget.currentIndex() == 0:
+            # Switch to tools
+            self.stacked_widget.setCurrentIndex(1)
+            self.tools_button.setText("⬅ Regresar")
+            self.tools_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498db;
+                    color: white;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    margin-bottom: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #2980b9;
+                }
+            """)
+        else:
+            # Switch to projects
+            self.stacked_widget.setCurrentIndex(0)
+            self.tools_button.setText("🚀 Tools")
+            self.tools_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #34495e;
+                    color: white;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    font-size: 14px;
+                    margin-bottom: 10px;
+                }
+                QPushButton:hover {
+                    background-color: #2c3e50;
+                }
+            """)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
