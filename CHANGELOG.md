@@ -86,3 +86,4 @@
 - Fix bug in path gif and webp in project info tab.
 - Add categories summary in project info tab.
 - Fix bug in TODO tab when select item.
+- New version 0.2.11 Beta
