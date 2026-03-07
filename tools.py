@@ -15,6 +15,7 @@ import socket
 import ssl
 import ipaddress
 import base64
+import shlex
 from urllib.parse import urlparse
 from utils import is_windows
 
@@ -335,6 +336,36 @@ class CurlClientWidget(QWidget):
 
         self.request_tabs.addTab(options_widget, "Options")
 
+        # 6. cURL Tab
+        curl_widget = QWidget()
+        curl_layout = QVBoxLayout(curl_widget)
+        
+        self.raw_curl_edit = QTextEdit()
+        self.raw_curl_edit.setPlaceholderText("Paste or type your raw curl command here...\nExample: curl -X GET https://api.example.com")
+        self.raw_curl_edit.setFont(QFont("Consolas", 10))
+        
+        self.run_raw_curl_btn = QPushButton("Run cURL")
+        self.run_raw_curl_btn.setMinimumHeight(35)
+        self.run_raw_curl_btn.setCursor(Qt.PointingHandCursor)
+        self.run_raw_curl_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2980b9;
+                color: white;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #3498db;
+            }
+        """)
+        self.run_raw_curl_btn.clicked.connect(self.execute_raw_curl)
+        
+        curl_layout.addWidget(self.raw_curl_edit)
+        curl_layout.addWidget(self.run_raw_curl_btn)
+        
+        self.request_tabs.addTab(curl_widget, "cURL")
+
         self.layout.addWidget(self.request_tabs)
 
         # Response Section
@@ -532,6 +563,23 @@ class CurlClientWidget(QWidget):
             cmd.append("--ssl-no-revoke")
             
         self.run_command(cmd)
+
+    @Slot()
+    def execute_raw_curl(self):
+        text = self.raw_curl_edit.toPlainText().strip()
+        if not text:
+            self.response_output.setText("Error: cURL command is empty.")
+            return
+        
+        try:
+            # Parse command using shlex
+            cmd = shlex.split(text)
+            if not cmd or cmd[0] != "curl":
+                self.response_output.setText("Error: Command must start with 'curl'")
+                return
+            self.run_command(cmd)
+        except Exception as e:
+            self.response_output.setText(f"Error parsing command: {str(e)}")
 
     def run_command(self, cmd):
         # Auto-append silent flag for curl if we want clean output
