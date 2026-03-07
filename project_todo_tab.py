@@ -20,6 +20,7 @@ class ProjectTodoTab(QWidget):
         self.project_id = project_id
         self.todos_collection = self.main_window.db.todos
         self.current_todo_id = None
+        self.current_todo_item = None  # Rastreo explícito del item seleccionado
 
         self.init_ui()
         self.load_todos()
@@ -123,6 +124,7 @@ class ProjectTodoTab(QWidget):
             
             # Clean vars
             self.current_todo_id = None
+            self.current_todo_item = None
             self.title_input.clear()
             self.text_editor.clear()
             
@@ -166,8 +168,11 @@ class ProjectTodoTab(QWidget):
 
     def select_todo_item(self, item):
         if not item: return
+        # Guardar el item ANTERIOR con referencia explícita antes de cambiar el ID
+        # (currentItem() ya devuelve el nuevo item cuando Qt dispara itemClicked)
         self.save_current_todo()
         self.current_todo_id = item.data(Qt.UserRole)
+        self.current_todo_item = item
         data = self.todos_collection.find_one({"_id": ObjectId(self.current_todo_id)})
         
         if data:
@@ -190,27 +195,29 @@ class ProjectTodoTab(QWidget):
         if self.current_todo_id:
             self.save_timer.start()
 
-    def save_current_todo(self):
+    def save_current_todo(self, target_item=None):
             if not self.current_todo_id: return
             self.save_timer.stop()
             
             title = self.title_input.text()
-            # toPlainText() captura todos los caracteres Unicode (incluyendo ☐ y ☑)
-            #content = self.text_editor.toPlainText()
             content = self.text_editor.toMarkdown()
-            
 
             self.todos_collection.update_one(
                 {"_id": ObjectId(self.current_todo_id)},
                 {"$set": {
                     "title": title, 
                     "content": content,
-                    "project_id": str(self.project_id) # Aseguramos consistencia
+                    "project_id": str(self.project_id)
                 }}
             )
             
-            curr = self.todo_list_widget.currentItem()
-            if curr: curr.setText(title)
+            # Siempre usar el item rastreado explícitamente, nunca currentItem()
+            item_to_update = self.current_todo_item
+            if item_to_update:
+                try:
+                    item_to_update.setText(title)
+                except RuntimeError:
+                    self.current_todo_item = None
 
     def update_project_id(self, new_project_id):
         if self.current_todo_id:

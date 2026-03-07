@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
         self.project_note_tab = ProjectNoteTab(self)
         self.setting_tab = SettingTab(self)
         self.about_tab = AboutTab(self)
+        
         self.tabs.addTab(self.project_tab, "Project")
         self.tabs.addTab(self.project_info_tab, "Information")
         self.tabs.addTab(self.project_todo_tab, "Todo")
@@ -231,6 +232,8 @@ class MainWindow(QMainWindow):
             print("Mongita: Colección 'projects' creada automáticamente al primer insert.")
         if 'todos' not in self.db.list_collection_names():
             print("Mongita: Colección 'todos' creada automáticamente al primer insert.")
+        if 'categories' not in self.db.list_collection_names():
+            print("Mongita: Colección 'categories' creada automáticamente al primer insert.")
 
     def add_create_project_button(self):
         create_project_button = QPushButton("Create Project")
@@ -289,7 +292,8 @@ class MainWindow(QMainWindow):
                 self.gif_labels.append((item, gif_label))
                 item.setIcon(QIcon(gif_label.currentPixmap()))
             else:
-                item.setIcon(QIcon(icon_path))
+                resolved = get_resource_path(icon_path)
+                item.setIcon(QIcon(resolved))
             
             item.icon_path = icon_path
             self.project_list_widget.addItem(item)
@@ -349,13 +353,21 @@ class MainWindow(QMainWindow):
             gif_label = GIFLabel(icon_path)
             icon = QIcon(gif_label.currentPixmap())
         else:
-            icon = QIcon(icon_path)
+            icon = QIcon(get_resource_path(icon_path))
         self.current_project_item.setIcon(icon)
 
         #self.project_todo_tab.project_id = self.current_project_id
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_note_tab.set_project_id(self.current_project_id)
+
+        # Sincronizar filtro de categories en Information tab (desde info items)
+        info = project.get("info", {})
+        categories = sorted({
+            v.get("category", "") for v in info.values()
+            if isinstance(v, dict) and v.get("category", "")
+        })
+        self.project_info_tab.update_categories_filter(categories)
 
         self.project_info_tab.clear_search()
         self.tabs.setCurrentWidget(self.project_info_tab)
@@ -383,7 +395,7 @@ class MainWindow(QMainWindow):
                             self.gif_labels.append((item, gif_label))
                             item.setIcon(QIcon(gif_label.currentPixmap()))
                     else:
-                        item.setIcon(QIcon(icon_path))
+                        item.setIcon(QIcon(get_resource_path(icon_path)))
                     item.icon_path = icon_path 
                     break
 
