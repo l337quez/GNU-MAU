@@ -55,7 +55,7 @@ class ProjectTab(QWidget):
         self.category_selector.setEditable(True)
         self.category_selector.setInsertPolicy(QComboBox.NoInsert)
         self.category_selector.lineEdit().setPlaceholderText("Category")
-        self.category_selector.setFixedWidth(120)
+        self.category_selector.setFixedWidth(128)
         self._cat_completer = QCompleter(self)
         self._cat_completer.setCaseSensitivity(Qt.CaseInsensitive)
         self._cat_completer.setFilterMode(Qt.MatchContains)

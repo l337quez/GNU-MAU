@@ -117,6 +117,31 @@ class ProjectNoteTab(QWidget):
         self.notes_list_widget.itemClicked.connect(self.open_selected_note)
         self.explorer_layout.addWidget(self.notes_list_widget)
 
+        # Inline Confirmation Widget
+        self.delete_confirm_widget = QWidget()
+        self.delete_confirm_layout = QVBoxLayout(self.delete_confirm_widget)
+        self.delete_confirm_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.delete_confirm_label = QLabel()
+        self.delete_confirm_label.setWordWrap(True)
+        self.delete_confirm_label.setStyleSheet("color: red; font-weight: bold;")
+        self.delete_confirm_layout.addWidget(self.delete_confirm_label)
+
+        button_layout = QHBoxLayout()
+        self.confirm_btn = QPushButton("Yes, Delete")
+        self.confirm_btn.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold;")
+        self.confirm_btn.clicked.connect(self.perform_delete)
+        
+        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.cancel_delete)
+        
+        button_layout.addWidget(self.confirm_btn)
+        button_layout.addWidget(self.cancel_btn)
+        self.delete_confirm_layout.addLayout(button_layout)
+        
+        self.delete_confirm_widget.hide()
+        self.explorer_layout.addWidget(self.delete_confirm_widget)
+
         # --- EDITOR ---
         self.editor_group = QWidget()
         self.editor_layout = QVBoxLayout(self.editor_group)
@@ -445,37 +470,43 @@ class ProjectNoteTab(QWidget):
     
     @Slot()
     def delete_selected_note(self):
-        """Delete the currently selected note after confirmation"""
+        """Show inline confirmation for deleting the currently selected note"""
         current_item = self.notes_list_widget.currentItem()
         if not current_item:
             return
         
-        note_path = current_item.data(Qt.UserRole)
+        self.note_to_delete_path = current_item.data(Qt.UserRole)
         note_name = current_item.text().replace("📄 ", "")
         
-        # Show confirmation dialog
-        reply = QMessageBox.question(
-            self, 
-            "Delete Note", 
-            f"Are you sure you want to delete '{note_name}'?\n\nThis action cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        # Show inline confirmation
+        self.delete_confirm_label.setText(f"Are you sure you want to delete '{note_name}'?")
+        self.delete_confirm_widget.show()
         
-        if reply == QMessageBox.Yes:
+        # Focus on the 'No' option initially to be safe
+        self.cancel_btn.setFocus()
+
+    @Slot()
+    def perform_delete(self):
+        if hasattr(self, 'note_to_delete_path') and self.note_to_delete_path:
             try:
-                # Delete the file
-                if os.path.exists(note_path):
-                    os.remove(note_path)
+                if os.path.exists(self.note_to_delete_path):
+                    os.remove(self.note_to_delete_path)
                 
-                # If the deleted note was currently open, clear editors
-                if self.current_note_file == note_path:
+                if self.current_note_file == self.note_to_delete_path:
                     self.current_note_file = None
                     self.edit_area.clear()
                     self.view_area.clear()
                 
-                # Reload the notes list
                 self.load_notes_from_dir()
-                
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Could not delete note: {e}")
+                # Optionally, instead of a popup, we could show this in the UI
+                self.delete_confirm_label.setText(f"Error: Could not delete note: {str(e)}")
+                return # Don't hide the widget if there's an error so user sees it
+        
+        self.cancel_delete()
+
+    @Slot()
+    def cancel_delete(self):
+        self.note_to_delete_path = None
+        self.delete_confirm_widget.hide()
+        self.notes_list_widget.setFocus()

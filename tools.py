@@ -968,7 +968,9 @@ class SignatureToolsWidget(QWidget):
 
 
 class CurlWrapperTab(QWidget): 
-    # This is now the main container, handling the tabs
+    """
+    Container for the tabs of the curl wrapper
+    """
     def __init__(self, main_window):
         super().__init__()
         self.layout = QVBoxLayout(self)
@@ -976,19 +978,19 @@ class CurlWrapperTab(QWidget):
         
         self.tabs = QTabWidget()
 
-        # Tab 1: HTTP Client (Original Logic)
+        # Tab HTTP Client (Original Logic)
         self.http_client = CurlClientWidget(main_window)
         self.tabs.addTab(self.http_client, "HTTP Client")
 
-        # Tab 2: Network
+        # Tab Network Tools
         self.network_tools = NetworkToolsWidget()
         self.tabs.addTab(self.network_tools, "Network")
 
-        # Tab 3: Security
+        # Tab Security Tools
         self.security_tools = SecurityToolsWidget()
         self.tabs.addTab(self.security_tools, "Security")
 
-        # Tab 4: Signature
+        # Tab Signature Tools
         self.signature_tools = SignatureToolsWidget()
         self.tabs.addTab(self.signature_tools, "Signature")
 
