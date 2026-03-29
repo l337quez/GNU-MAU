@@ -23,7 +23,6 @@ class ProjectInfoTab(QWidget):
         self.search_input.returnPressed.connect(self.search_info)
         buttons_layout.addWidget(self.search_input)
 
-        # Filtro por categoría
         self.category_filter = QComboBox()
         self.category_filter.addItem("All categories")
         self.category_filter.setFixedWidth(146)
@@ -32,7 +31,6 @@ class ProjectInfoTab(QWidget):
 
         self.info_layout.addLayout(buttons_layout)
 
-        # Widget de confirmación de borrado
         self.confirmation_widget = QWidget()
         self.confirmation_widget.setVisible(False)
         confirm_layout = QHBoxLayout(self.confirmation_widget)
@@ -209,16 +207,16 @@ class ProjectInfoTab(QWidget):
         value_item = self.additional_info_table.item(row_position, 1)
         
         if key_item and value_item:
-            old_key = key_item.data(Qt.UserRole)  # Obtén el key original antes de la edición
+            old_key = key_item.data(Qt.UserRole)  # Get the original key before editing
             new_key = key_item.text()
             value = value_item.text()
 
-            # Asegurar que current_project_info existe
+            # Ensure that current_project_info exists
             if not hasattr(self.main_window, 'current_project_info'):
                 self.main_window.current_project_info = {}
 
-            if old_key != new_key:  # Si el key ha cambiado
-                # Actualiza el diccionario del proyecto
+            if old_key != new_key:  # If the key has changed
+                # Update the project dictionary
                 if old_key in self.main_window.current_project_info:
                     info_item = self.main_window.current_project_info.pop(old_key)
                     if isinstance(info_item, dict):
@@ -236,7 +234,6 @@ class ProjectInfoTab(QWidget):
                 else:
                     self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
 
-            # Actualiza la base de datos
             projects_collection = self.main_window.db.projects
             p_id = self.main_window.current_project_id
             if isinstance(p_id, str): p_id = ObjectId(p_id)
@@ -248,7 +245,6 @@ class ProjectInfoTab(QWidget):
                 }}
             )
 
-            # Actualiza el key original almacenado en UserRole para futuras ediciones
             key_item.setData(Qt.UserRole, new_key)
             self.main_window.statusBar().showMessage(f"Key '{new_key}' saved successfully!", 2000)
 
@@ -291,7 +287,9 @@ class ProjectInfoTab(QWidget):
             self.additional_info_table.showRow(row)
 
     def update_categories_filter(self, categories: list):
-        """Actualiza el combo filtro con las categories del proyecto."""
+        """
+        Update the combo filter with the project categories.
+        """
         self.category_filter.blockSignals(True)
         self.category_filter.clear()
         self.category_filter.addItem("All categories")
@@ -303,7 +301,6 @@ class ProjectInfoTab(QWidget):
     def change_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar Icono", "", "Imágenes PNG (*.png);;Imágenes GIF (*.gif);;Imágenes WebP (*.webp)")
         if icon_path:
-            # Convertir a ruta relativa para que sea portable
             stored_path = make_relative_path(icon_path)
             self.main_window.current_project_item.setIcon(QIcon(icon_path))
             projects_collection = self.main_window.db.projects

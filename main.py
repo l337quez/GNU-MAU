@@ -17,8 +17,9 @@ from project_tab import ProjectTab
 from project_info_tab import ProjectInfoTab
 from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
+from project_diagram_tab import ProjectDiagramTab
 from tools import CurlWrapperTab
-from utils import get_resource_path, is_windows
+from utils import get_resource_path, clean_text_format, is_windows
 
 
 load_dotenv()
@@ -123,6 +124,7 @@ class MainWindow(QMainWindow):
         self.project_info_tab = ProjectInfoTab(self)
         self.project_todo_tab = ProjectTodoTab(self, project_id=self.current_project_id)
         self.project_note_tab = ProjectNoteTab(self)
+        self.project_diagram_tab = ProjectDiagramTab(self)
         self.setting_tab = SettingTab(self)
         self.about_tab = AboutTab(self)
         
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.project_info_tab, "Information")
         self.tabs.addTab(self.project_todo_tab, "Todo")
         self.tabs.addTab(self.project_note_tab, "Note")
+        self.tabs.addTab(self.project_diagram_tab, "Diagram")
         self.tabs.addTab(self.setting_tab, "Setting")
         self.tabs.addTab(self.about_tab, "About")
 
@@ -138,8 +141,6 @@ class MainWindow(QMainWindow):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setWidget(self.project_list_widget)
-
-        self.add_create_project_button()
 
         sidebar_layout = QVBoxLayout()
         
@@ -163,6 +164,22 @@ class MainWindow(QMainWindow):
         self.tools_button.clicked.connect(self.toggle_tools_view)
         sidebar_layout.addWidget(self.tools_button)
         
+        self.create_project_button = QPushButton("➕ Create Project")
+        self.create_project_button.setFixedHeight(35)
+        self.create_project_button.setCursor(Qt.PointingHandCursor)
+        self.create_project_button.setStyleSheet("""
+            QPushButton {
+                color: white;
+                border-radius: 5px;
+                font-weight: bold;
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+        """)
+        self.create_project_button.clicked.connect(self.show_create_project_form)
+        sidebar_layout.addWidget(self.create_project_button)
+
         sidebar_layout.addWidget(scroll_area)
 
         sidebar_widget = QWidget()
@@ -235,21 +252,6 @@ class MainWindow(QMainWindow):
         if 'categories' not in self.db.list_collection_names():
             print("Mongita: Colección 'categories' creada automáticamente al primer insert.")
 
-    def add_create_project_button(self):
-        create_project_button = QPushButton("Create Project")
-        create_project_button.setMaximumSize(24, 24)
-        create_project_button.setStyleSheet("padding: 4px; margin: 4px;")
-        create_project_button.setFixedWidth(110)
-
-        size_policy = QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        create_project_button.setSizePolicy(size_policy)
-        create_project_button.clicked.connect(self.show_create_project_form)
-        
-        create_project_item = QListWidgetItem(self.project_list_widget)
-        create_project_item.setSizeHint(create_project_button.sizeHint())
-        create_project_item.setData(Qt.UserRole, None) 
-        self.project_list_widget.setItemWidget(create_project_item, create_project_button)
-
     def show_create_project_form(self):
         self.current_project_item = None
         self.current_project_name = ""
@@ -268,7 +270,6 @@ class MainWindow(QMainWindow):
         projects = projects_collection.find()
         
         self.project_list_widget.clear()
-        self.add_create_project_button() 
         
         for project in projects:
             description = project['description'] if len(project['description']) <= 8 else project['description'][:8] + "..."
@@ -298,8 +299,8 @@ class MainWindow(QMainWindow):
             item.icon_path = icon_path
             self.project_list_widget.addItem(item)
 
-        if self.project_list_widget.count() > 1:
-            first_project_item = self.project_list_widget.item(1)
+        if self.project_list_widget.count() > 0:
+            first_project_item = self.project_list_widget.item(0)
             self.project_list_widget.setCurrentItem(first_project_item)
             self.display_project_info(first_project_item)
 
@@ -360,6 +361,7 @@ class MainWindow(QMainWindow):
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_note_tab.set_project_id(self.current_project_id)
+        self.project_diagram_tab.set_project_id(self.current_project_id)
 
         # Sincronizar filtro de categories en Information tab (desde info items)
         info = project.get("info", {})

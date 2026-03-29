@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
                                QMessageBox, QSplitter, QInputDialog, QStackedWidget, 
                                QRadioButton, QDialogButtonBox, QLabel, QDialog)
 from PySide6.QtGui import (QFont, QTextCursor, Qt, QTextCharFormat)
-from PySide6.QtCore import (Qt, Slot)
+from PySide6.QtCore import (Qt, Slot, QSize)
 
 import os, markdown2
 from utils import get_resource_path, clean_text_format
@@ -45,7 +45,7 @@ class ProjectNoteTab(QWidget):
         self.current_note_file = None
         self.project_id = None
         self.notes_dir = ""
-        self.is_rich_text = False # Nueva bandera para el modo de la nota
+        self.is_rich_text = False 
 
         self.preview_css = """
         <style>
@@ -114,7 +114,9 @@ class ProjectNoteTab(QWidget):
         self.explorer_layout.addLayout(self.top_bar)
         
         self.notes_list_widget = QListWidget()
+        self.notes_list_widget.setStyleSheet("QListWidget QLineEdit { padding: 0px; margin: 0px; height: 26px; }")
         self.notes_list_widget.itemClicked.connect(self.open_selected_note)
+        self.notes_list_widget.itemChanged.connect(self.on_note_renamed)
         self.explorer_layout.addWidget(self.notes_list_widget)
 
         # Inline Confirmation Widget
@@ -142,11 +144,9 @@ class ProjectNoteTab(QWidget):
         self.delete_confirm_widget.hide()
         self.explorer_layout.addWidget(self.delete_confirm_widget)
 
-        # --- EDITOR ---
         self.editor_group = QWidget()
         self.editor_layout = QVBoxLayout(self.editor_group)
 
-        # --- TOOLBAR --- 
         self.toolbar = QHBoxLayout()
         self.save_btn = QPushButton("💾 Save")
         self.save_btn.clicked.connect(self.save_current_note)
@@ -230,11 +230,9 @@ class ProjectNoteTab(QWidget):
         
         # Connections
         self.new_note_btn.clicked.connect(self.create_new_note)
-        # self.clean_button.clicked.connect(clean_text_format)
         self.clean_button.clicked.connect(lambda: clean_text_format(self.edit_area, self.save_current_note))
         self.search_input.textChanged.connect(self.filter_notes)
         
-        # Lógica de inserción/formato dinámica
         self.bold_btn.clicked.connect(self.handle_bold)
         self.italic_btn.clicked.connect(self.handle_italic)
         self.quote_btn.clicked.connect(lambda: self.insert_md("> ", ""))
@@ -283,6 +281,8 @@ class ProjectNoteTab(QWidget):
             for f in files:
                 item = QListWidgetItem(f"📄 {f}")
                 item.setData(Qt.UserRole, os.path.join(self.notes_dir, f))
+                item.setFlags(item.flags() | Qt.ItemIsEditable)
+                item.setSizeHint(QSize(0, 30))
                 self.notes_list_widget.addItem(item)
 
     def render_markdown(self):
@@ -327,7 +327,6 @@ class ProjectNoteTab(QWidget):
                     
                     self.edit_area.blockSignals(True)
                     if self.is_rich_text:
-                        # Para persistencia perfecta en Rich Text, usamos HTML
                         self.edit_area.setHtml(content)
                         self.mode_btn.setVisible(False)
                         self.stack.setCurrentIndex(0)
@@ -361,6 +360,7 @@ class ProjectNoteTab(QWidget):
                 QMessageBox.critical(self, "Error", f"Could not save: {e}")
 
     def insert_md(self, prefix, suffix):
+        
         if self.stack.currentIndex() != 0: return 
         cursor = self.edit_area.textCursor()
         if cursor.hasSelection():
@@ -399,7 +399,6 @@ class ProjectNoteTab(QWidget):
                 except Exception as e:
                     QMessageBox.critical(self, "Error", str(e))
 
-    # --- HANDLERS PARA FORMATO HIBRIDO ---
     def handle_bold(self):
         if self.is_rich_text:
             cursor = self.edit_area.textCursor()
@@ -470,7 +469,9 @@ class ProjectNoteTab(QWidget):
     
     @Slot()
     def delete_selected_note(self):
-        """Show inline confirmation for deleting the currently selected note"""
+        """
+        Show inline confirmation for deleting the currently selected note
+        """
         current_item = self.notes_list_widget.currentItem()
         if not current_item:
             return
@@ -510,3 +511,32 @@ class ProjectNoteTab(QWidget):
         self.note_to_delete_path = None
         self.delete_confirm_widget.hide()
         self.notes_list_widget.setFocus()
+
+    @Slot(QListWidgetItem)
+    def on_note_renamed(self, item):
+        old_path = item.data(Qt.UserRole)
+        if not old_path or not os.path.exists(old_path):
+            return
+
+        new_name = item.text()
+        if new_name.startswith("📄 "):
+            new_name = new_name[2:]
+        else:
+            self.notes_list_widget.blockSignals(True)
+            item.setText(f"📄 {new_name}")
+            self.notes_list_widget.blockSignals(False)
+            
+        old_dir = os.path.dirname(old_path)
+        new_path = os.path.join(old_dir, new_name)
+
+        if old_path != new_path:
+            try:
+                os.rename(old_path, new_path)
+                item.setData(Qt.UserRole, new_path)
+                if self.current_note_file == old_path:
+                    self.current_note_file = new_path
+            except Exception as e:
+                self.notes_list_widget.blockSignals(True)
+                item.setText(f"📄 {os.path.basename(old_path)}")
+                self.notes_list_widget.blockSignals(False)
+                QMessageBox.critical(self, "Error", f"Could not rename note: {e}")

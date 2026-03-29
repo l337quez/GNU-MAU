@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QListWidget, QListWidgetItem, QLineEdit, QAbstractItemView, QMessageBox,
-    QApplication
+    QApplication, QLabel
 )
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QTextCursor, QTextCharFormat, QFont
@@ -26,9 +26,40 @@ class ProjectTodoTab(QWidget):
         self.load_todos()
 
     def init_ui(self):
-        self.main_layout = QHBoxLayout(self)
+        self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(15, 15, 15, 15)
-        self.main_layout.setSpacing(20)
+        self.main_layout.setSpacing(5)
+
+        # Confirmation Widget (Inline - Top Level)
+        self.confirmation_widget = QWidget()
+        self.confirmation_widget.setVisible(False)
+        self.confirm_layout = QVBoxLayout(self.confirmation_widget)
+        self.confirm_layout.setContentsMargins(0, 0, 0, 10)
+        self.confirm_layout.setSpacing(5)
+
+        self.confirm_label = QLabel("Delete this TODO?")
+        self.confirm_label.setStyleSheet("color: #ff4d4d; font-weight: bold; font-size: 14px;")
+        self.confirm_layout.addWidget(self.confirm_label)
+
+        self.confirm_btns_layout = QHBoxLayout()
+        self.confirm_yes_btn = QPushButton("Yes, Delete")
+        self.confirm_yes_btn.setStyleSheet("background-color: #ff4d4d; color: white; padding: 5px 15px;")
+        self.confirm_yes_btn.clicked.connect(self.confirm_deletion)
+        
+        self.confirm_no_btn = QPushButton("Cancel")
+        self.confirm_no_btn.clicked.connect(self.cancel_deletion)
+        
+        self.confirm_btns_layout.addWidget(self.confirm_yes_btn)
+        self.confirm_btns_layout.addWidget(self.confirm_no_btn)
+        self.confirm_btns_layout.addStretch()
+        self.confirm_layout.addLayout(self.confirm_btns_layout)
+
+        self.main_layout.addWidget(self.confirmation_widget)
+
+        # Container for panels
+        self.panels_layout = QHBoxLayout()
+        self.panels_layout.setSpacing(20)
+        self.main_layout.addLayout(self.panels_layout)
 
         self.left_panel = QWidget()
         self.left_panel_layout = QVBoxLayout(self.left_panel)
@@ -100,8 +131,8 @@ class ProjectTodoTab(QWidget):
         self.right_panel_layout.addLayout(self.toolbar_layout)
         self.right_panel_layout.addWidget(self.text_editor)
 
-        self.main_layout.addWidget(self.left_panel, 1)
-        self.main_layout.addWidget(self.right_panel, 2)
+        self.panels_layout.addWidget(self.left_panel, 1)
+        self.panels_layout.addWidget(self.right_panel, 2)
 
         self.save_timer = QTimer(self)
         self.save_timer.setInterval(1000)
@@ -111,15 +142,15 @@ class ProjectTodoTab(QWidget):
     def delete_current_todo(self):
         if not self.current_todo_id:
             return
+        
+        title = self.title_input.text()
+        self.confirm_label.setText(f"Delete '{title}'?")
+        self.confirmation_widget.setVisible(True)
+        self.delete_button.setEnabled(False)
+        self.add_button.setEnabled(False)
 
-        # Confirmación de usuario
-        reply = QMessageBox.question(
-            self, 'Remove TODO',
-            "Are you sure you want to remove this TODO?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-
-        if reply == QMessageBox.Yes:
+    def confirm_deletion(self):
+        if self.current_todo_id:
             self.todos_collection.delete_one({"_id": ObjectId(self.current_todo_id)})
             
             # Clean vars
@@ -129,6 +160,12 @@ class ProjectTodoTab(QWidget):
             self.text_editor.clear()
             
             self.load_todos()
+        self.cancel_deletion()
+
+    def cancel_deletion(self):
+        self.confirmation_widget.setVisible(False)
+        self.delete_button.setEnabled(True)
+        self.add_button.setEnabled(True)
 
     def load_todos(self):
         self.title_input.blockSignals(True)
