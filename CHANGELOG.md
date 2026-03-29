@@ -87,3 +87,10 @@
 - Add categories summary in project info tab.
 - Fix bug in TODO tab when select item.
 - New version 0.2.11 Beta
+
+#### ⟳ Changelog Beta version 0.2.12 (2026-03-29)
+- Add new tools in diagram tab.
+- Fix bug in diagram tab.
+- New version 0.2.12 Beta
+- Fix bug in project info tab when delete key and value.
+- Fix name of the tab diagram and notes.

@@ -162,7 +162,8 @@ class MainWindow(QMainWindow):
             }
         """)
         self.tools_button.clicked.connect(self.toggle_tools_view)
-        sidebar_layout.addWidget(self.tools_button)
+        # sidebar_layout.addWidget(self.tools_button)
+        self.tools_button.hide()
         
         self.create_project_button = QPushButton("➕ Create Project")
         self.create_project_button.setFixedHeight(35)

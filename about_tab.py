@@ -65,7 +65,7 @@ class AboutTab(QWidget):
         labels_layout.setContentsMargins(20, 20, 20, 20)
 
         labels_data = [
-            ("version:", "v0.2.11 Beta"),
+            ("version:", "v0.2.12 Beta"),
             ("license:", "GPL V3"),
             ("packaged:", "Ronal Forero"),
             ("translated:", "Ronal Forero"),
