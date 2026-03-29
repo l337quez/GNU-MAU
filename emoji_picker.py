@@ -41,6 +41,10 @@ class EmojiPicker(QDialog):
             "🚀": "cohete rocket",
             "💻": "pc ordenador laptop code",
             "📝": "nota escribir memo",
+            "🎫": "ticket entrada boleto",
+            "🎯": "objetivo meta",
+            "⏳": "tiempo espera",
+            "💡": "idea",
             "📌": "pin fijar",
             "🔗": "link enlace cadena",
             "🐍": "python serpiente"

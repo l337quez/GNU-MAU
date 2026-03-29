@@ -77,3 +77,20 @@
 - New version 0.2.9
 - fix automatic restore database and store when update version 
 
+#### ⟳ Changelog Beta version 0.2.10 (2026-02-18)
+- Fix save key and value in project info tab.
+- Add new feacture, when delete key and value in project info tab, show a confirmation dialog.
+- New version 0.2.10 Beta
+
+#### ⟳ Changelog Beta version 0.2.11 (2026-03-01)
+- Fix bug in path gif and webp in project info tab.
+- Add categories summary in project info tab.
+- Fix bug in TODO tab when select item.
+- New version 0.2.11 Beta
+
+#### ⟳ Changelog Beta version 0.2.12 (2026-03-29)
+- Add new tools in diagram tab.
+- Fix bug in diagram tab.
+- New version 0.2.12 Beta
+- Fix bug in project info tab when delete key and value.
+- Fix name of the tab diagram and notes.

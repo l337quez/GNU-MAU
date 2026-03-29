@@ -20,6 +20,29 @@ def get_resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
+def make_relative_path(absolute_path):
+    """
+    Converts an absolute path to a relative path if the file is inside
+    the program's base directory. Otherwise returns the absolute path unchanged.
+    This ensures icon paths stored in the DB are portable when moving the app folder.
+    """
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    
+    try:
+        relative = os.path.relpath(absolute_path, base_path)
+        # If the relative path goes outside the base dir (starts with '..'), keep absolute
+        if not relative.startswith('..'):
+            # Normalize to forward slashes for consistency
+            return relative.replace('\\', '/')
+    except ValueError:
+        # On Windows, relpath raises ValueError for paths on different drives
+        pass
+    
+    return absolute_path
+
 def open_system_terminal(command):
     """
     Opens the system's default terminal and executes the command.

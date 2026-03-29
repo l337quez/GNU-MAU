@@ -4,7 +4,7 @@ from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
 from bson.objectid import ObjectId
-from utils import get_resource_path, open_system_terminal, open_browser, is_windows
+from utils import get_resource_path, make_relative_path, open_system_terminal, open_browser, is_windows
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
@@ -13,17 +13,48 @@ class ProjectInfoTab(QWidget):
         self.info_layout = QVBoxLayout()
 
         self.project_name_label = QLabel("Project name")
+        self.project_name_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 5px;")
         self.info_layout.addWidget(self.project_name_label)
 
-        self.project_description_label = QLabel("Project description")
-        self.info_layout.addWidget(self.project_description_label)
 
         buttons_layout = QHBoxLayout()
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search by key")
         self.search_input.returnPressed.connect(self.search_info)
         buttons_layout.addWidget(self.search_input)
+
+        self.category_filter = QComboBox()
+        self.category_filter.addItem("All categories")
+        self.category_filter.setFixedWidth(146)
+        self.category_filter.currentIndexChanged.connect(self.search_info)
+        buttons_layout.addWidget(self.category_filter)
+
         self.info_layout.addLayout(buttons_layout)
+
+        self.confirmation_widget = QWidget()
+        self.confirmation_widget.setVisible(False)
+        confirm_layout = QHBoxLayout(self.confirmation_widget)
+        confirm_layout.setContentsMargins(0, 5, 0, 5)
+        
+        self.confirm_label = QLabel("Are you sure delete this record?")
+        self.confirm_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
+        
+        self.confirm_yes_btn = QPushButton("Delete")
+        self.confirm_yes_btn.setStyleSheet("background-color: #e74c3c; color: white; padding: 5px 10px;")
+        self.confirm_yes_btn.clicked.connect(self.confirm_deletion)
+        
+        self.confirm_no_btn = QPushButton("Cancel")
+        self.confirm_no_btn.setStyleSheet("padding: 5px 10px;")
+        self.confirm_no_btn.clicked.connect(self.cancel_deletion)
+        
+        confirm_layout.addWidget(self.confirm_label)
+        confirm_layout.addWidget(self.confirm_yes_btn)
+        confirm_layout.addWidget(self.confirm_no_btn)
+        confirm_layout.addStretch()
+        
+        self.info_layout.addWidget(self.confirmation_widget)
+        
+        self.row_to_delete = -1
 
         self.info_form_layout = QHBoxLayout()
         self.info_name_input = QLineEdit()
@@ -32,7 +63,7 @@ class ProjectInfoTab(QWidget):
         self.info_value_input.setPlaceholderText("value")
         
         self.action_selector = QComboBox()
-        self.action_selector.addItems(["🚫 None", "💻 Terminal", "🌐 Browser"])
+        self.action_selector.addItems(["\U0001f6ab None", "\U0001f4bb Terminal", "\U0001f310 Browser"])
         self.action_selector.setFixedWidth(110)
 
         self.add_info_button = QPushButton("Add")
@@ -58,32 +89,31 @@ class ProjectInfoTab(QWidget):
 
 
     def update_project_info(self, name, description, info):
-        self.project_name_label.setText(f"Name: {name}")
-        self.project_description_label.setText(f"Description: {description}")
+        self.project_name_label.setText(f"Project: {name}")
         self.clear_table()
         info_dict = info if isinstance(info, dict) else {}
         for key, info_item in info_dict.items():
             value = info_item["value"] if isinstance(info_item, dict) else info_item
-            
-            # Soporte compatibilidad
+            category = ""
             action = "none"
             if isinstance(info_item, dict):
+                category = info_item.get("category", "")
                 action = info_item.get("action")
                 if not action and info_item.get("terminal"):
                     action = "terminal"
-            
-            self.add_info_item(key, value, action)
+            self.add_info_item(key, value, action, category)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value, action=None):
+    def add_info_item(self, key, value, action=None, category=""):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         
         key_item = QTableWidgetItem(key)
         key_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
-        key_item.setData(Qt.UserRole, key)
+        key_item.setData(Qt.UserRole, key)            # key original (para edición)
+        key_item.setData(Qt.UserRole + 1, category)  # categoría asignada
         self.additional_info_table.setItem(row_position, 0, key_item)
         
         value_item = QTableWidgetItem(value)
@@ -99,7 +129,7 @@ class ProjectInfoTab(QWidget):
         copy_button = QPushButton()
         copy_button.setIcon(QIcon(get_resource_path("assets/icons/icon_copy.png")))
         copy_button.setMaximumSize(24, 24)
-        copy_button.clicked.connect(lambda: self.copy_to_clipboard(value))
+        copy_button.clicked.connect(lambda k=key, v=value: self.copy_to_clipboard(k, v))
         actions_layout.addWidget(copy_button)
 
         delete_button = QPushButton()
@@ -144,7 +174,22 @@ class ProjectInfoTab(QWidget):
             pos = button.mapTo(self.additional_info_table.viewport(), QPoint(0, 0))
             index = self.additional_info_table.indexAt(pos)
             if index.isValid():
-                self.delete_row(index.row())
+                self.row_to_delete = index.row()
+                key_item = self.additional_info_table.item(self.row_to_delete, 0)
+                key_text = key_item.text() if key_item else "this record"
+                self.confirm_label.setText(f"Are you sure delete {key_text}?")
+                self.confirmation_widget.setVisible(True)
+
+    @Slot()
+    def confirm_deletion(self):
+        if self.row_to_delete >= 0:
+            self.delete_row(self.row_to_delete)
+        self.cancel_deletion()
+
+    @Slot()
+    def cancel_deletion(self):
+        self.row_to_delete = -1
+        self.confirmation_widget.setVisible(False)
 
     @Slot()
     def on_save_clicked(self):
@@ -162,16 +207,16 @@ class ProjectInfoTab(QWidget):
         value_item = self.additional_info_table.item(row_position, 1)
         
         if key_item and value_item:
-            old_key = key_item.data(Qt.UserRole)  # Obtén el key original antes de la edición
+            old_key = key_item.data(Qt.UserRole)  # Get the original key before editing
             new_key = key_item.text()
             value = value_item.text()
 
-            # Asegurar que current_project_info existe
+            # Ensure that current_project_info exists
             if not hasattr(self.main_window, 'current_project_info'):
                 self.main_window.current_project_info = {}
 
-            if old_key != new_key:  # Si el key ha cambiado
-                # Actualiza el diccionario del proyecto
+            if old_key != new_key:  # If the key has changed
+                # Update the project dictionary
                 if old_key in self.main_window.current_project_info:
                     info_item = self.main_window.current_project_info.pop(old_key)
                     if isinstance(info_item, dict):
@@ -189,7 +234,6 @@ class ProjectInfoTab(QWidget):
                 else:
                     self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
 
-            # Actualiza la base de datos
             projects_collection = self.main_window.db.projects
             p_id = self.main_window.current_project_id
             if isinstance(p_id, str): p_id = ObjectId(p_id)
@@ -201,7 +245,6 @@ class ProjectInfoTab(QWidget):
                 }}
             )
 
-            # Actualiza el key original almacenado en UserRole para futuras ediciones
             key_item.setData(Qt.UserRole, new_key)
             self.main_window.statusBar().showMessage(f"Key '{new_key}' saved successfully!", 2000)
 
@@ -218,9 +261,20 @@ class ProjectInfoTab(QWidget):
     @Slot()
     def search_info(self):
         search_key = self.search_input.text().lower()
+        selected_cat = self.category_filter.currentText()
+        filter_by_cat = selected_cat != "All categories"
+
         for row in range(self.additional_info_table.rowCount()):
-            item = self.additional_info_table.item(row, 0)
-            if item and search_key in item.text().lower():
+            key_item = self.additional_info_table.item(row, 0)
+            key_match = (not search_key) or (key_item and search_key in key_item.text().lower())
+
+            if filter_by_cat:
+                stored_cat = key_item.data(Qt.UserRole + 1) if key_item else ""
+                cat_match = (stored_cat == selected_cat)
+            else:
+                cat_match = True
+
+            if key_match and cat_match:
                 self.additional_info_table.showRow(row)
             else:
                 self.additional_info_table.hideRow(row)
@@ -228,13 +282,26 @@ class ProjectInfoTab(QWidget):
     @Slot()
     def clear_search(self):
         self.search_input.clear()
+        self.category_filter.setCurrentIndex(0)
         for row in range(self.additional_info_table.rowCount()):
             self.additional_info_table.showRow(row)
+
+    def update_categories_filter(self, categories: list):
+        """
+        Update the combo filter with the project categories.
+        """
+        self.category_filter.blockSignals(True)
+        self.category_filter.clear()
+        self.category_filter.addItem("All categories")
+        for cat in sorted(categories):
+            self.category_filter.addItem(cat)
+        self.category_filter.blockSignals(False)
 
     @Slot()
     def change_icon(self):
         icon_path, _ = QFileDialog.getOpenFileName(self, "Seleccionar Icono", "", "Imágenes PNG (*.png);;Imágenes GIF (*.gif);;Imágenes WebP (*.webp)")
         if icon_path:
+            stored_path = make_relative_path(icon_path)
             self.main_window.current_project_item.setIcon(QIcon(icon_path))
             projects_collection = self.main_window.db.projects
             
@@ -243,7 +310,7 @@ class ProjectInfoTab(QWidget):
 
             result = projects_collection.update_one(
                 {"_id": p_id},
-                {"$set": {"icon_path": icon_path}}
+                {"$set": {"icon_path": stored_path}}
             )
             print(f"Icon path updated: {result.modified_count} document(s) modified.")     
 
@@ -256,9 +323,9 @@ class ProjectInfoTab(QWidget):
             idx = self.action_selector.currentIndex()
             action_type = [None, "terminal", "browser"][idx]
             
-            info_data = {"value": value, "action": action_type}
+            info_data = {"value": value, "action": action_type, "category": ""}
             self.main_window.current_project_info[name] = info_data
-            self.add_info_item(name, value, action_type)
+            self.add_info_item(name, value, action_type, "")
 
             projects_collection = self.main_window.db.projects
             p_id = self.main_window.current_project_id
@@ -275,10 +342,12 @@ class ProjectInfoTab(QWidget):
             self.info_value_input.clear()
             self.action_selector.setCurrentIndex(0)
 
-    @Slot()
-    def copy_to_clipboard(self, text):
+    @Slot(str, str)
+    def copy_to_clipboard(self, key, value):
         clipboard = QApplication.clipboard()
-        clipboard.setText(text)
+        clipboard.setText(value)
+        if hasattr(self.main_window, 'statusBar'):
+            self.main_window.statusBar().showMessage(f"Copied key '{key}' successfully!", 2000)
 
     @Slot()
     def delete_row(self, row_position):
