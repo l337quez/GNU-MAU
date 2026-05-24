@@ -1,15 +1,14 @@
 {
-  "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#7a5d33",
-    "titleBar.activeForeground": "#ffffff",
-    "titleBar.inactiveBackground": "#7a5d33",
-    "titleBar.inactiveForeground": "#ffffff90",
-    "activityBar.background": "#7a5d33",
-    "activityBar.foreground": "#ffffff",
-    "activityBar.activeBorder": "#ffffff",
-    "activityBar.inactiveForeground": "#ffffff90",
-    "activityBarBadge.foreground": "#000000",
-    "activityBarBadge.background": "#fffff2"
-  },
-  "window.title": "d:\\video\\GNU Mau- usando db mongita"
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#bf9740",
+        "titleBar.activeForeground": "#000000",
+        "titleBar.inactiveBackground": "#bf9740",
+        "titleBar.inactiveForeground": "#00000090",
+        "activityBar.background": "#bf9740",
+        "activityBar.foreground": "#000000",
+        "activityBar.activeBorder": "#000000",
+        "activityBar.inactiveForeground": "#00000090",
+        "activityBarBadge.foreground": "#ffffff",
+        "activityBarBadge.background": "#000000"
+    }
 }

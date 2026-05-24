@@ -10,7 +10,7 @@
 
 ## ✨ Key Features
 
-### � Project Management
+### 📁 Project Management
 
 - **Centralized Info**: Store project-specific credentials, URLs, and documentation.
 - **Embedded Terminal**: Execute project commands directly from the interface using quick-access terminal buttons.
@@ -47,49 +47,104 @@
 
 ## 🚀 Setup & Installation
 
-Mau uses **Poetry** for robust dependency management, ensuring a consistent environment.
+GNU Mau está organizado como un **monorepo** con dos proyectos independientes:
 
-### Prerequisites
+| Carpeta | Descripción | Tecnología |
+|---------|-------------|------------|
+| `desktop/` | Aplicación de escritorio | PySide6 + Poetry |
+| `backend/` | API REST | FastAPI + uvicorn |
 
-- Python 3.10+
+---
+
+## 🖥️ Desktop App (PySide6)
+
+La app de escritorio usa **Poetry** para la gestión de dependencias.
+
+### Prerrequisitos
+
+- Python 3.11+
 - [Poetry](https://python-poetry.org/docs/#installation)
 
-### Getting Started
+### Correr la aplicación
 
-1. **Install Dependencies**:
+```bash
+# 1. Entrar a la carpeta del desktop
+cd desktop
 
-   ```bash
-   poetry install
-   ```
+# 2. Instalar dependencias
+poetry install
 
-2. **Activate Environment**:
+# 3. Lanzar la aplicación
+poetry run python app/main.py
+```
 
-   ```bash
-   poetry shell
-   ```
-
-3. **Launch Application**:
-   ```bash
-   python main.py
-   ```
-
-_Tip: You can also run it directly using `poetry run python main.py`._
+> **Tip:** También puedes activar el entorno con `poetry shell` y luego correr `python app/main.py`.
 
 ---
 
-## 🛠️ Internal Development
+## ⚡ Backend API (FastAPI)
 
-To maintain a healthy codebase, please use Poetry for dependency changes:
+La API REST corre en un entorno virtual propio dentro de `backend/`.
 
-- **Add Package**: `poetry add <package-name>`
-- **Remove Package**: `poetry remove <package-name>`
-- **Update Dependencies**: `poetry update`
+### Prerrequisitos
+
+- Python 3.13+
+
+### Correr la API
+
+```bash
+# 1. Entrar a la carpeta del backend
+cd backend
+
+# 2. Crear entorno virtual (solo la primera vez)
+python -m venv venv
+
+# 3. Instalar dependencias
+#    En Git Bash / Linux / Mac:
+venv/Scripts/pip install -r requirements.txt
+#    En PowerShell / CMD:
+venv\Scripts\pip install -r requirements.txt
+
+# 4. Iniciar el servidor con recarga automática
+#    En Git Bash / Linux / Mac:
+venv/Scripts/uvicorn app.main:app --reload --port 8000
+#    En PowerShell / CMD:
+venv\Scripts\uvicorn app.main:app --reload --port 8000
+```
+
+### Endpoints disponibles
+
+Una vez corriendo, accede a la documentación interactiva:
+
+- **Swagger UI:** http://127.0.0.1:8000/docs
+- **ReDoc:** http://127.0.0.1:8000/redoc
+- **Health check:** http://127.0.0.1:8000/api/health
 
 ---
 
-## ⚙️ Configuration & Restoration
+## 🛠️ Desarrollo Interno
 
-GNU Mau includes utilities for database management and restoration in the **Settings** tab. Always ensure you have a backup of your `projects_db` if performing manual restorations.
+### Desktop (Poetry)
+
+- **Agregar paquete:** `poetry add <paquete>`
+- **Eliminar paquete:** `poetry remove <paquete>`
+- **Actualizar dependencias:** `poetry update`
+
+### Backend (pip + venv)
+
+- **Agregar paquete:** `venv/Scripts/pip install <paquete>` y luego actualizar `requirements.txt`
+
+---
+
+## ⚙️ Configuración & Base de Datos
+
+GNU Mau usa **Mongita** (MongoDB embebido en Python) para almacenar los datos localmente. La base de datos se encuentra en:
+
+```
+desktop/app/mongita_data/
+```
+
+> ⚠️ La API backend apunta a esta misma base de datos. Asegúrate de no correr ambos procesos escribiendo simultáneamente en la misma colección para evitar conflictos.
 
 ---
 
