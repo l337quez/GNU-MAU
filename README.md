@@ -45,35 +45,31 @@
 
 ---
 
-## 🚀 Setup & Installation
+## 🚀 Setup & Installation (Windows & Linux)
 
-Mau uses **Poetry** for robust dependency management, ensuring a consistent environment.
+Para una explicación exhaustiva con comandos paso a paso para ambas plataformas, consulta la **[Guía de Ejecución y Compilación (GUIA_EJECUCION.md)](file:///home/ronal/Proyectos/GNU%20Mau-%20usando%20db%20mongita/GUIA_EJECUCION.md)**.
 
-### Prerequisites
+### 🐧 En Linux (Fedora)
+- **Con Podman (Recomendado para desarrollo)**:
+  ```bash
+  ./start.sh
+  ```
+- **Compilar Binario Nativo (standalone ELF)**:
+  ```bash
+  ./build_linux.sh
+  ./dist/gnu-mau
+  ```
 
-- Python 3.10+
-- [Poetry](https://python-poetry.org/docs/#installation)
-
-### Getting Started
-
-1. **Install Dependencies**:
-
-   ```bash
-   poetry install
-   ```
-
-2. **Activate Environment**:
-
-   ```bash
-   poetry shell
-   ```
-
-3. **Launch Application**:
-   ```bash
-   python main.py
-   ```
-
-_Tip: You can also run it directly using `poetry run python main.py`._
+### 🪟 En Windows
+- **Con Poetry (Desarrollo)**:
+  ```powershell
+  poetry install
+  poetry run python main.py
+  ```
+- **Compilar Binario `.exe`**:
+  ```powershell
+  poetry run pyinstaller setup.spec --clean
+  ```
 
 ---
 

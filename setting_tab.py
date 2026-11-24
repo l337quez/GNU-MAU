@@ -10,7 +10,7 @@ from reusable_progress import CustomProgressBar
 import os, json, sys, shutil
 import urllib.request
 import zipfile, tarfile, tempfile
-from utils import is_windows
+from utils import is_windows, get_data_dir
 
 REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
 
@@ -123,16 +123,16 @@ class ExtractionThread(QThread):
                 import shutil
                 shutil.unpack_archive(self.archive_path, extract_path)
             
-            new_internal = None
+            new_root = None
             for root, dirs, files in os.walk(extract_path):
                 if "_internal" in dirs:
-                    new_internal = os.path.join(root, "_internal")
+                    new_root = root
                     break
             
-            if new_internal:
-                self.finished.emit(new_internal)
+            if new_root:
+                self.finished.emit(new_root)
             else:
-                self.error.emit("Could not find '_internal' folder in the update package.")
+                self.error.emit("Could not find application root (missing '_internal') in the update package.")
         except Exception as e:
             self.error.emit(str(e))
 
@@ -151,10 +151,12 @@ class SettingTab(QWidget):
 
         # Map display names to internal names
         self.theme_map = {
+            "Default": "Default",
             "Arctic Mist": "arctic_mist",
-            "Amber Dusk": "amber_dusk",
             "Dark Theme": "dark_theme",
-            "Light Theme": "Light Theme"
+            "Light Theme": "light_theme",
+            "Tokyo Night": "tokyo_night",
+            "Solarized Light": "solarized_light"
         }
         self.reverse_theme_map = {v: k for k, v in self.theme_map.items()}
 
@@ -182,25 +184,41 @@ class SettingTab(QWidget):
         self.info_layout.addWidget(sidebar_group)
 
         # Restoration Section
-        db_group = QGroupBox("Database and storage restoration")
+        db_group = QGroupBox("Updates & Data Management")
         db_group_v_layout = QVBoxLayout()
         
         buttons_layout = QHBoxLayout()
+        self.auto_restore_btn = QPushButton("Check for App Updates")
+        self.auto_restore_btn.setFixedWidth(160)
         
-        self.manual_restore_btn = QPushButton("Manual restoration")
+        self.manual_restore_btn = QPushButton("Restore from folder")
         self.manual_restore_btn.setFixedWidth(160)
+        self.auto_restore_btn.clicked.connect(self.check_updates)
         self.manual_restore_btn.clicked.connect(self.copy_files)
         
-        self.auto_restore_btn = QPushButton("Automatic restoration")
-        self.auto_restore_btn.setFixedWidth(160)
-        # Placeholder for automatic restoration logic
-        self.auto_restore_btn.clicked.connect(self.check_updates)
         
-        buttons_layout.addWidget(self.manual_restore_btn)
         buttons_layout.addWidget(self.auto_restore_btn)
+        buttons_layout.addWidget(self.manual_restore_btn)
         buttons_layout.addStretch()
         
         db_group_v_layout.addLayout(buttons_layout)
+        
+        # Inline Confirmation Widget
+        self.update_confirmation_widget = QWidget()
+        conf_layout = QHBoxLayout(self.update_confirmation_widget)
+        conf_layout.setContentsMargins(0, 5, 0, 0)
+        self.update_msg_label = QLabel()
+        self.update_msg_label.setStyleSheet("font-weight: bold;")
+        self.btn_update_yes = QPushButton("Aceptar")
+        self.btn_update_yes.setFixedWidth(100)
+        self.btn_update_no = QPushButton("Cancelar")
+        self.btn_update_no.setFixedWidth(100)
+        conf_layout.addWidget(self.update_msg_label)
+        conf_layout.addWidget(self.btn_update_yes)
+        conf_layout.addWidget(self.btn_update_no)
+        conf_layout.addStretch()
+        self.update_confirmation_widget.hide()
+        db_group_v_layout.addWidget(self.update_confirmation_widget)
         
         # Instructional Note
         self.restoration_note = QLabel("<i>Note: for manual restoration you must select the folder where you have the data and then select the _internal folder</i>")
@@ -221,10 +239,7 @@ class SettingTab(QWidget):
         db_group.setLayout(db_group_v_layout)
         self.info_layout.addWidget(db_group)
 
-        self.check_update_btn = QPushButton("Find Updates")
-        self.check_update_btn.setFixedWidth(140) 
-        self.check_update_btn.clicked.connect(self.check_updates)
-        self.info_layout.addWidget(self.check_update_btn)
+
 
         # Tray checkbox
         self.tray_checkbox = QCheckBox("Minimize to tray when closing")
@@ -296,7 +311,7 @@ class SettingTab(QWidget):
     def load_available_themes(self):
         self.theme_combo.blockSignals(True)
         self.theme_combo.clear()
-        self.theme_combo.addItem("Light Theme")
+        self.theme_combo.addItem("Default")
         
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
@@ -315,7 +330,7 @@ class SettingTab(QWidget):
         self.theme_combo.blockSignals(False)
 
     def apply_theme(self, theme_name):
-        if theme_name == "Light Theme":
+        if theme_name == "Default":
             self.main_window.setStyleSheet("")
         else:
             qss_file = self.get_qss_path(theme_name)
@@ -395,22 +410,27 @@ class SettingTab(QWidget):
 
             self.status_text.append("Preparing update files...")
             
-            QMessageBox.information(
-                self,
-                "Update Ready",
-                "The application will close to update the data and will restart automatically."
-            )
+            try:
+                self.btn_update_yes.clicked.disconnect()
+                self.btn_update_no.clicked.disconnect()
+            except: pass
+            
+            self.update_msg_label.setText("Restoration Prepared. Restart to apply?")
+            self.btn_update_yes.show()
+            self.btn_update_no.setText("Cancel")
+            
+            def do_manual_restart():
+                self.update_confirmation_widget.hide()
+                import subprocess
+                popen_args = {"shell": True}
+                if is_windows():
+                    popen_args["creationflags"] = 0x00000010 | 0x00000008 
+                subprocess.Popen([batch_path], **popen_args)
+                sys.exit(0)
 
-            # Ejecutar el script de forma independiente
-            import subprocess
-            popen_args = {"shell": True}
-            if is_windows():
-                # CREATE_NEW_CONSOLE is only available on Windows
-                popen_args["creationflags"] = 0x00000010 # subprocess.CREATE_NEW_CONSOLE
-            
-            subprocess.Popen([batch_path], **popen_args)
-            
-            sys.exit(0)
+            self.btn_update_yes.clicked.connect(do_manual_restart)
+            self.btn_update_no.clicked.connect(self.update_confirmation_widget.hide)
+            self.update_confirmation_widget.show()
 
         except Exception as e:
             error_msg = f"Error in copy_files: {str(e)}"
@@ -443,7 +463,7 @@ class SettingTab(QWidget):
         Start finding updates
         """
         self.status_text.append("Searching for updates...")
-        self.check_update_btn.setEnabled(False)
+        self.auto_restore_btn.setEnabled(False)
 
         # Search for version.txt in the same folder as the executable/script
         base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -455,23 +475,32 @@ class SettingTab(QWidget):
         self.update_thread = UpdateCheckThread(version_path)
         self.update_thread.update_available.connect(self.on_update_result)
         self.update_thread.error_occurred.connect(self.on_update_error)
-        self.update_thread.finished.connect(lambda: self.check_update_btn.setEnabled(True))
+        self.update_thread.finished.connect(lambda: self.auto_restore_btn.setEnabled(True))
         self.update_thread.start()
 
     @Slot(bool, str, str)
     def on_update_result(self, is_available, local, remote):
+        try:
+            self.btn_update_yes.clicked.disconnect()
+            self.btn_update_no.clicked.disconnect()
+        except:
+            pass
+
         if is_available:
-            msg = f"¡Versión {remote} disponible! (Actual: {local})\n\n¿Desea actualizar automáticamente?"
-            reply = QMessageBox.question(self, "Update Available", msg, 
-                                         QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            self.update_msg_label.setText(f"¡Versión {remote} disponible! ¿Actualizar automáticamente?")
+            self.btn_update_yes.show()
+            self.btn_update_yes.setText("Actualizar")
+            self.btn_update_no.setText("Ignorar")
             
-            if reply == QMessageBox.Yes:
-                self.start_auto_update(remote)
-            elif reply == QMessageBox.No:
-                import webbrowser
-                webbrowser.open("https://github.com/l337quez/GNU-MAU")
+            self.btn_update_yes.clicked.connect(lambda: [self.update_confirmation_widget.hide(), self.start_auto_update(remote)])
+            self.btn_update_no.clicked.connect(self.update_confirmation_widget.hide)
+            self.update_confirmation_widget.show()
         else:
-            QMessageBox.information(self, "Update", f"You're up to date ({local}).")
+            self.update_msg_label.setText(f"You're up to date ({local}).")
+            self.btn_update_yes.hide()
+            self.btn_update_no.setText("Okay")
+            self.btn_update_no.clicked.connect(self.update_confirmation_widget.hide)
+            self.update_confirmation_widget.show()
             self.status_text.append("System is up to date.")
 
     def start_auto_update(self, version):
@@ -524,9 +553,9 @@ class SettingTab(QWidget):
         self.extraction_thread.error.connect(lambda err: self.on_extraction_error(err, archive_path))
         self.extraction_thread.start()
 
-    def on_extraction_finished(self, new_internal, version):
+    def on_extraction_finished(self, new_root, version):
         self.status_text.append("Update extracted. Preparing installation...")
-        self.run_auto_install_script(new_internal, version)
+        self.run_auto_install_script(new_root, version)
 
     def on_extraction_error(self, error, archive_path):
         self.status_text.append(f"Extraction Error: {error}")
@@ -534,7 +563,7 @@ class SettingTab(QWidget):
         QMessageBox.critical(self, "Update Error", f"Failed to extract update: {error}")
 
 
-    def run_auto_install_script(self, new_internal, version):
+    def run_auto_install_script(self, new_root, version):
         if getattr(sys, 'frozen', False):
             base_path = os.path.dirname(sys.executable)
             exe_path = sys.executable
@@ -548,32 +577,27 @@ class SettingTab(QWidget):
         # Backup folder path
         backup_dir = os.path.join(base_path, "backup_before_update")
         
-        # Data destination paths: STRICTLY match main.py logic
-        # If frozen (EXE), data goes inside _internal
-        if getattr(sys, 'frozen', False):
-            storage_dest = os.path.join(dest_internal, "storage")
-            mongita_dest = os.path.join(dest_internal, "mongita_data")
-        else:
-            storage_dest = os.path.join(base_path, "storage")
-            mongita_dest = os.path.join(base_path, "mongita_data")
+        # Data destination paths: dynamically resolved via get_data_dir
+        storage_dest = get_data_dir("storage")
+        mongita_dest = get_data_dir("mongita_data")
         
         # Source paths in the update package
-        def find_src_path(name, extracted_internal):
-            internal_src = os.path.join(extracted_internal, name)
-            root_src = os.path.join(os.path.dirname(extracted_internal), name)
+        def find_src_path(name, extracted_root):
+            internal_src = os.path.join(extracted_root, "_internal", name)
+            root_src = os.path.join(extracted_root, name)
             if os.path.exists(internal_src): return internal_src
             if os.path.exists(root_src): return root_src
-            return internal_src # Default
+            return root_src # Default
 
-        storage_src = find_src_path("storage", new_internal)
+        storage_src = find_src_path("storage", new_root)
         storage_backup = os.path.join(backup_dir, "storage")
         
-        mongita_src = find_src_path("mongita_data", new_internal)
+        mongita_src = find_src_path("mongita_data", new_root)
         mongita_backup = os.path.join(backup_dir, "mongita_data")
         
         # Find version.txt
         version_src = None
-        search_dirs = [os.path.dirname(new_internal), new_internal]
+        search_dirs = [new_root, os.path.join(new_root, "_internal")]
         for sdir in search_dirs:
             v_path = os.path.join(sdir, "version.txt")
             if os.path.exists(v_path):
@@ -594,10 +618,10 @@ class SettingTab(QWidget):
         set "LOG_FILE=%~dp0update_log.txt"
         echo --- GNU MAU UPDATE LOG [%date% %time%] --- > "%LOG_FILE%"
 
-        :: 1. Kill entire process tree
+        :: 1. Kill process gracefully without /T
         echo STEP 1: Killing processes... >> "%LOG_FILE%" 2>&1
-        taskkill /f /t /im "GNU Mau.exe" >> "%LOG_FILE%" 2>&1
-        taskkill /f /t /im python.exe >> "%LOG_FILE%" 2>&1
+        taskkill /f /im "GNU Mau.exe" >> "%LOG_FILE%" 2>&1
+        taskkill /f /im python.exe >> "%LOG_FILE%" 2>&1
         
         echo STEP 2: Waiting for release... >> "%LOG_FILE%" 2>&1
         timeout /t 5 /nobreak > nul
@@ -617,8 +641,7 @@ class SettingTab(QWidget):
         :: 4. Update Core files
         echo STEP 4: Updating application files... >> "%LOG_FILE%" 2>&1
         if exist "{dest_internal}" rd /s /q "{dest_internal}" >> "%LOG_FILE%" 2>&1
-        mkdir "{dest_internal}" >> "%LOG_FILE%" 2>&1
-        xcopy "{new_internal}" "{dest_internal}" /s /e /i /y >> "%LOG_FILE%" 2>&1
+        xcopy "{new_root}" "{base_path}" /s /e /i /y >> "%LOG_FILE%" 2>&1
 
         :: 5. RESTORATION (CRITICAL)
         echo STEP 5: Restoring user data... >> "%LOG_FILE%" 2>&1
@@ -659,19 +682,29 @@ class SettingTab(QWidget):
             with open(batch_path, "w") as f:
                 f.write(batch_content)
 
-            QMessageBox.information(
-                self,
-                "Update Ready",
-                "The update has been downloaded and prepared. The application will restart to complete the installation and a backup of your data has been created in 'backup_before_update'."
-            )
-
-            import subprocess
-            popen_args = {"shell": True}
-            if is_windows():
-                popen_args["creationflags"] = 0x00000010 
+            try:
+                self.btn_update_yes.clicked.disconnect()
+                self.btn_update_no.clicked.disconnect()
+            except: pass
             
-            subprocess.Popen([batch_path], **popen_args)
-            sys.exit(0)
+            self.update_msg_label.setText("Update download complete. Restart to apply?")
+            self.btn_update_yes.show()
+            self.btn_update_yes.setText("Restart")
+            self.btn_update_no.setText("Cancel")
+            
+            def do_restart():
+                self.update_confirmation_widget.hide()
+                import subprocess
+                popen_args = {"shell": True}
+                if is_windows():
+                    popen_args["creationflags"] = 0x00000010 | 0x00000008 
+                
+                subprocess.Popen([batch_path], **popen_args)
+                sys.exit(0)
+
+            self.btn_update_yes.clicked.connect(do_restart)
+            self.btn_update_no.clicked.connect(self.update_confirmation_widget.hide)
+            self.update_confirmation_widget.show()
 
         except Exception as e:
             QMessageBox.critical(self, "Update Error", f"Failed to prepare installation: {e}")

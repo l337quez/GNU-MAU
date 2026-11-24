@@ -94,3 +94,14 @@
 - New version 0.2.12 Beta
 - Fix bug in project info tab when delete key and value.
 - Fix name of the tab diagram and notes.
+
+#### ⟳ Changelog Beta version 0.2.13 (2026-03-30)
+- Add sort indicator in project info tab.
+
+#### ⟳ Changelog Beta version 0.2.13 (2026-04-02)
+- Add new theme Tokyo Night.
+- Add new theme Solarized Light.
+- Delete theme Amber Dusk.
+- Fix styles in dark theme and light theme.
+- Fix bug for update version and change buttons name in settings tab.
+

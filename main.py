@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
                                QWidget, QVBoxLayout, QSystemTrayIcon,
                                QMenu, QListWidget, QScrollArea, QLabel,
                                QDockWidget, QListWidgetItem, QPushButton)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie
+from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie, QFontDatabase
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer
 from PySide6.QtWidgets import QSizePolicy, QStackedWidget
 import json, sys, os
@@ -19,7 +19,7 @@ from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
 from project_diagram_tab import ProjectDiagramTab
 from tools import CurlWrapperTab
-from utils import get_resource_path, clean_text_format, is_windows
+from utils import get_resource_path, clean_text_format, is_windows, get_data_dir
 
 
 load_dotenv()
@@ -37,6 +37,10 @@ class GIFLabel(QLabel):
             self.movie_obj = QMovie(resolved_path)
             self.setMovie(self.movie_obj)
             self.movie_obj.start()
+        else:
+            fallback = get_resource_path("assets/project_images/default_icon.png")
+            if os.path.exists(fallback):
+                self.setPixmap(QPixmap(fallback).scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
         # if os.path.exists(gif_path):
         #     self.movie_obj = QMovie(gif_path)
@@ -54,13 +58,8 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("GNU Mau")
         self.setGeometry(300, 300, 800, 600)
 
-        self.storage_dir = os.path.join(os.path.dirname(__file__), "storage")
-        if not os.path.exists(self.storage_dir):
-            try:
-                os.makedirs(self.storage_dir)
-                print(f"Directorio principal 'storage' creado en: {self.storage_dir}")
-            except OSError as e:
-                print(f"Error al crear directorio storage: {e}")
+        self.storage_dir = get_data_dir("storage")
+        print(f"Directorio principal 'storage' usando: {self.storage_dir}")
 
         self.config_path = os.path.join(os.path.expanduser("~"), ".myapp", "config.json")
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
@@ -95,7 +94,8 @@ class MainWindow(QMainWindow):
         self.db_name = "projects_db"
 
         print("Connecting to Mongita...")
-        mongita_db_dir = os.path.join(os.path.dirname(__file__), "mongita_data")
+        mongita_db_dir = get_data_dir("mongita_data")
+        print(f"Mongita data dir: {mongita_db_dir}")
         os.environ["MONGITA_DIR"] = mongita_db_dir
         self.client = MongitaClientDisk(mongita_db_dir)
         self.db = self.client[self.db_name]
@@ -471,6 +471,11 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    emoji_font = get_resource_path("assets/fonts/NotoColorEmoji.ttf")
+    if os.path.exists(emoji_font):
+        font_id = QFontDatabase.addApplicationFont(emoji_font)
+        if font_id != -1:
+            print("Loaded bundled emoji font:", QFontDatabase.applicationFontFamilies(font_id))
     window = MainWindow()
     window.show()
     def on_exit():

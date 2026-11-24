@@ -1,0 +1,22 @@
+name: gnu-mau
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gnu-mau-app
+    restart: unless-stopped
+    security_opt:
+      - label=disable
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - XDG_RUNTIME_DIR=/tmp/runtime-root
+    volumes:
+      # GUI X11 Forwarding para mostrar la interfaz gráfica
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Volúmenes persistentes guardados en tu disco /mnt/ronal_disk/contenedores/
+      - /mnt/ronal_disk/contenedores/gnu_mau_data/mongita_data:/app/mongita_data:z
+      - /mnt/ronal_disk/contenedores/gnu_mau_data/storage:/app/storage:z
+    network_mode: host

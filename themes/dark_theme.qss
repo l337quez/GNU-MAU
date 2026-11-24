@@ -1,56 +1,212 @@
+/* --- ESTILO GENERAL --- */
 QWidget {
     background-color: #1e1e1e;
-    color: #cccccc;  
+    color: #d4d4d4;
+    font-size: 10pt;
 }
-QTabBar::tab {
-    background-color: #1e1e1e;
-    color: #cccccc;  
-    padding: 5px 10px;  
-    border: 1px solid #3e3e3e;  
-}
-QTabBar::tab:selected {
-    background-color: #2e2e2e;  
-    border-bottom-color: #1e1e1e; 
-}
+
+
+
 QPushButton {
-    background-color: #3e3e3e;
-    color: #cccccc;  
-    border: 1px solid #cccccc; 
+    background-color: #333333;
+    color: #d4d4d4;
+    border: 1px solid #007acc;
+    border-radius: 4px;        /* Reducido un poco para que encaje mejor */
+    padding: 2px;              /* Reducimos el padding al mínimo para que no empuje el borde */
+    min-height: 18px;          /* Bajamos la altura mínima de 22px a 18px */
+    max-height: 22px;          /* Añadimos una altura máxima para que no crezca de más */
+    min-width: 24px;           /* Un poco más de ancho para que el icono respire */
+}
+
+
+QPushButton:hover {
+    background-color: #454545;
+    border: 1px solid #0098ff; /* Brillo al pasar el mouse */
+}
+
+QPushButton:pressed {
+    background-color: #252526;
+    padding-left: 5px; 
+    padding-top: 5px;
+}
+
+/* --- QCOMBOBOX (Flecha Moderna) --- */
+QComboBox {
+    border: 1px solid #454545;
     border-radius: 5px;
+    padding: 5px 30px 5px 10px;
+    background-color: #252526;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 25px;
+    border-left: 1px solid #454545;
+}
+
+QComboBox::down-arrow {
+    image: none; 
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #0098ff; 
+    margin-top: 2px;
+}
+
+/* --- CAMPOS DE TEXTO (Redondeados) --- */
+QLineEdit {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #454545;
+    border-radius: 5px; /* Consistente con los botones */
     padding: 5px;
 }
-QPushButton:hover {
-    background-color: #4e4e4e;
-}
-QTableWidget {
-    background-color: #3e3e3e;
-    color: #cccccc; 
-    gridline-color: #cccccc;  
-    border: 1px solid #cccccc; 
-}
-QHeaderView::section {
-    background-color: #3e3e3e;
-    color: #cccccc;  
-    border: 1px solid #cccccc;  
-}
-QTabWidget::pane {
-    border: 2px solid #2e2e2e; 
-}
-QLineEdit {
-    background-color: #3e3e3e; 
-    color: #cccccc; 
-    border: 1px solid #cccccc; 
-    border-radius: 3px; 
-    padding: 5px;  
-}
+
 QLineEdit:focus {
-    border: 1px solid #4e4e4e;  
+    border: 1px solid #0098ff;
 }
+
+/* --- TABS (Pestañas) --- */
+QTabBar::tab {
+    background-color: #252526;
+    color: #cccccc;
+    padding: 8px 15px;
+    border: 1px solid #454545;
+    border-bottom: none;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #333333;
+    color: #0098ff;
+    margin-bottom: -1px; 
+    border-top: 2px solid #0098ff;
+}
+
+/* --- PANEL Y TABLAS --- */
+QTabWidget::pane {
+    border: 1px solid #454545;
+    top: -1px; 
+    background-color: #1e1e1e;
+}
+
+QTableWidget {
+    background-color: #252526;
+    alternate-background-color: #1e1e1e; /* Esto quita el blanco de las filas alternas */
+    gridline-color: #454545;
+    border: 1px solid #454545;
+    border-radius: 5px;
+    color: #d4d4d4; /* Asegura que el texto sea claro */
+}
+
 QTableWidget::item {
-    background-color: #3e3e3e;  
-    color: #cccccc; 
+    background-color: #252526;
+    color: #d4d4d4;
 }
-QTableWidget::item:alternate {
-    background-color: #2e2e2e;  
-    color: #cccccc; 
+
+QTableWidget::item:selected {
+    background-color: #0098ff;
+    color: #1e1e1e;
+}
+
+QHeaderView::section {
+    background-color: #252526; /* Color oscuro igual a la tabla */
+    color: #0098ff;            /* Color azul claro para el texto */
+    padding: 5px;
+    border: 1px solid #1e1e1e;
+    font-weight: bold;         /* Para que resalte más */
+}
+
+QHeaderView {
+    background-color: #252526;
+    border: none;
+}
+
+
+/* --- SCROLLBAR VERTICAL --- */
+QScrollBar:vertical {
+    border: none;
+    background: #1e1e1e; /* Fondo igual al general */
+    width: 10px;         /* Más delgado y elegante */
+    margin: 0px 0px 0px 0px;
+}
+
+/* La barrita que se mueve */
+QScrollBar::handle:vertical {
+    background: #454545; /* Color gris azulado */
+    min-height: 20px;
+    border-radius: 5px;  /* Bordes redondeados */
+    margin: 2px;         /* Pequeño margen para que parezca flotar */
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #0098ff; /* Color azul brillante al pasar el mouse */
+}
+
+/* Eliminar las flechas de arriba y abajo */
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+/* --- SCROLLBAR HORIZONTAL (Opcional por si aparece) --- */
+QScrollBar:horizontal {
+    border: none;
+    background: #1e1e1e;
+    height: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #454545;
+    min-width: 20px;
+    border-radius: 5px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #0098ff;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* --- GROUPBOX  --- */
+QGroupBox {
+    border: 1px solid #454545; /* Gris azulado sutil en lugar de blanco */
+    border-radius: 6px;
+    margin-top: 1.2em; /* Espacio para el título */
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left; /* Título arriba a la izquierda */
+    left: 10px;
+    padding: 0 5px;
+    color: #0098ff; /* El azul claro que combina con tus botones */
+}
+
+
+/* --- CAMPO DE TEXTO MULTILiNEA (QTextEdit) --- */
+QTextEdit {
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #454545;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QTextEdit:focus {
+    border: 1px solid #0098ff;
 }

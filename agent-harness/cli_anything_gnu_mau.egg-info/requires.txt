@@ -1,0 +1,5 @@
+click>=8.0
+mongita<2.0.0,>=1.2.0
+python-dotenv
+prompt_toolkit>=3.0
+markdown2>=2.5
