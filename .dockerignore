@@ -1,0 +1,12 @@
+.git
+.gitignore
+.docker-data
+build
+dist
+__pycache__
+*.pyc
+mongita_data
+storage
+agent-harness
+.vscode
+.env

@@ -1,0 +1,29 @@
+name: gnu-mau
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gnu-mau:latest
+    container_name: gnu-mau-app
+    restart: unless-stopped
+    security_opt:
+      - label=disable
+    environment:
+      # GUI X11 forwarding
+      DISPLAY: ${DISPLAY:-:0}
+      QT_X11_NO_MITSHM: "1"
+      QT_QPA_PLATFORM: ${QT_QPA_PLATFORM:-xcb}
+      XDG_RUNTIME_DIR: /tmp/runtime
+      # Persistent configuration and data (see utils.get_config_dir/get_data_dir)
+      GNU_MAU_CONFIG_DIR: /config
+      GNU_MAU_DATA_DIR: /data
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Override these paths in a .env file to reuse existing data, e.g.:
+      # GNU_MAU_CONFIG_PATH=/mnt/ronal_disk/contenedores/gnu_mau_data/config
+      # GNU_MAU_DATA_PATH=/mnt/ronal_disk/contenedores/gnu_mau_data
+      - ${GNU_MAU_CONFIG_PATH:-./.docker-data/config}:/config:z
+      - ${GNU_MAU_DATA_PATH:-./.docker-data/data}:/data:z
+    network_mode: host

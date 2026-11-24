@@ -51,7 +51,7 @@ Mau uses **Poetry** for robust dependency management, ensuring a consistent envi
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11 (PySide6 6.5 supports 3.11 only)
 - [Poetry](https://python-poetry.org/docs/#installation)
 
 ### Getting Started
@@ -75,6 +75,17 @@ Mau uses **Poetry** for robust dependency management, ensuring a consistent envi
 
 _Tip: You can also run it directly using `poetry run python main.py`._
 
+### Podman / Docker
+
+Run the app in a container with persistent data:
+
+```bash
+./start.sh
+```
+
+See [GUIA_CONTENEDOR.md](GUIA_CONTENEDOR.md) for volumes, X11 forwarding and
+troubleshooting.
+
 ---
 
 ## 🛠️ Internal Development
@@ -89,7 +100,13 @@ To maintain a healthy codebase, please use Poetry for dependency changes:
 
 ## ⚙️ Configuration & Restoration
 
-GNU Mau includes utilities for database management and restoration in the **Settings** tab. Always ensure you have a backup of your `projects_db` if performing manual restorations.
+Configuration lives in `~/.myapp/config.json` (or `$GNU_MAU_CONFIG_DIR` inside
+a container). Data is stored in `storage/` and `mongita_data/` next to the
+application (or in `$GNU_MAU_DATA_DIR`).
+
+Automatic and manual restorations create a backup in `backup_before_update/`
+and use native Python file operations, so they work on Windows, Linux and
+macOS. Always keep a copy of your `projects_db` before restoring data.
 
 ---
 

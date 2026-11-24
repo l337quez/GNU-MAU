@@ -6,9 +6,12 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget,
 from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer
 from PySide6.QtWidgets import QSizePolicy, QStackedWidget
-import json, sys, os
+import sys, os
 from bson.objectid import ObjectId
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:  # python-dotenv is optional at runtime
+    load_dotenv = None
 # Mau resources
 from about_tab import AboutTab
 from setting_tab import SettingTab
@@ -19,10 +22,13 @@ from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
 from project_diagram_tab import ProjectDiagramTab
 from tools import CurlWrapperTab
-from utils import get_resource_path, clean_text_format, is_windows
+from utils import (get_resource_path, clean_text_format, is_windows,
+                   get_storage_dir, get_mongita_dir, get_config_path,
+                   load_config, save_config, get_theme_stylesheet)
 
 
-load_dotenv()
+if load_dotenv is not None:
+    load_dotenv()
 
 if is_windows():
     import ctypes
@@ -54,7 +60,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("GNU Mau")
         self.setGeometry(300, 300, 800, 600)
 
-        self.storage_dir = os.path.join(os.path.dirname(__file__), "storage")
+        self.storage_dir = get_storage_dir()
         if not os.path.exists(self.storage_dir):
             try:
                 os.makedirs(self.storage_dir)
@@ -62,40 +68,56 @@ class MainWindow(QMainWindow):
             except OSError as e:
                 print(f"Error al crear directorio storage: {e}")
 
-        self.config_path = os.path.join(os.path.expanduser("~"), ".myapp", "config.json")
-        os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
+        self.config_path = get_config_path()
+        self.config = load_config()
 
-        self.config = {}
-        self.load_config()
+        self.setWindowTitle(self.config.get("window_title") or "GNU Mau")
+        geometry = self.config.get("window_geometry")
+        if isinstance(geometry, (list, tuple)) and len(geometry) == 4:
+            try:
+                self.setGeometry(*(int(value) for value in geometry))
+            except (TypeError, ValueError):
+                print(f"window_geometry inválida en la configuración: {geometry}")
+
+        self.apply_theme(self.config.get("theme", "Light Theme"))
 
         qp = QPixmap()
         qp.loadFromData(icon)
         appIcon = QIcon(qp)
         self.setWindowIcon(appIcon)
 
-        self.tray_icon = QSystemTrayIcon(appIcon, parent=self)
-        self.tray_icon.setToolTip("GNU Mau")
-        tray_menu = QMenu()
-        show_action = QAction("Show", self)
-        quit_action = QAction("Quit", self)
-        tray_menu.addAction(show_action)
-        tray_menu.addAction(quit_action)
-        self.tray_icon.setContextMenu(tray_menu)
+        # System tray support depends on the desktop environment. In headless
+        # containers or sessions without a StatusNotifier host it is not
+        # available: in that case closing the window must quit the app.
+        self.tray_available = QSystemTrayIcon.isSystemTrayAvailable()
+        self.tray_icon = None
+        if self.tray_available:
+            self.tray_icon = QSystemTrayIcon(appIcon, parent=self)
+            self.tray_icon.setToolTip("GNU Mau")
+            tray_menu = QMenu()
+            show_action = QAction("Show", self)
+            quit_action = QAction("Quit", self)
+            tray_menu.addAction(show_action)
+            tray_menu.addAction(quit_action)
+            self.tray_icon.setContextMenu(tray_menu)
 
-        show_action.triggered.connect(self.show)
-        quit_action.triggered.connect(QApplication.quit)
+            show_action.triggered.connect(self.show)
+            quit_action.triggered.connect(QApplication.quit)
 
-        self.tray_icon.show()
+            self.tray_icon.show()
+        else:
+            print("System tray not available: the app will close instead of minimizing.")
 
         self.current_project_name = ""
         self.current_project_description = ""
         self.current_project_item = None
         self.current_project_info = {}
         self.current_project_id = "default_project_id" 
-        self.db_name = "projects_db"
+        self.db_name = self.config.get("db_name", "projects_db")
 
         print("Connecting to Mongita...")
-        mongita_db_dir = os.path.join(os.path.dirname(__file__), "mongita_data")
+        mongita_db_dir = get_mongita_dir()
+        os.makedirs(mongita_db_dir, exist_ok=True)
         os.environ["MONGITA_DIR"] = mongita_db_dir
         self.client = MongitaClientDisk(mongita_db_dir)
         self.db = self.client[self.db_name]
@@ -205,9 +227,7 @@ class MainWindow(QMainWindow):
 
     def save_sidebar_position(self):
         position = self.dockWidgetArea(self.dock_widget)
-        self.config["sidebar_position"] = position.value
-        with open(self.config_path, 'w') as f:
-            json.dump(self.config, f, indent=4)
+        self.config = save_config({"sidebar_position": position.value})
 
     def move_sidebar(self, area):
         """
@@ -216,34 +236,16 @@ class MainWindow(QMainWindow):
         """
         self.addDockWidget(area, self.dock_widget)
 
-    def load_config(self):
-        if os.path.exists(self.config_path):
-            with open(self.config_path, 'r') as f:
-                self.config = json.load(f)
-            
-            # Use 'theme' key, fallback to 'dark_mode' for backward compatibility
-            theme = self.config.get("theme")
-            if theme is None:
-                dark_mode = self.config.get("dark_mode", False)
-                theme = "dark_theme" if dark_mode else "Light Theme"
-            
-            self.apply_theme(theme)
-
     def apply_theme(self, theme_name):
-        if theme_name == "Light Theme":
-            self.setStyleSheet("")
-        else:
-            if getattr(sys, 'frozen', False):
-                base_path = sys._MEIPASS
-            else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
-            
-            qss_file = os.path.join(base_path, "themes", f"{theme_name}.qss")
-            try:
-                with open(qss_file, "r") as f:
-                    self.setStyleSheet(f.read())
-            except FileNotFoundError:
-                print(f"Tema {theme_name} no encontrado en {qss_file}")
+        """
+        Apply a theme to the whole application.
+        Returns False when the QSS file for the theme is missing.
+        """
+        stylesheet = get_theme_stylesheet(theme_name)
+        if stylesheet is None:
+            return False
+        self.setStyleSheet(stylesheet)
+        return True
 
     def create_collections(self):
         if 'projects' not in self.db.list_collection_names():
@@ -360,7 +362,6 @@ class MainWindow(QMainWindow):
 
         #self.project_todo_tab.project_id = self.current_project_id
         self.project_todo_tab.update_project_id(self.current_project_id)
-        self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_note_tab.set_project_id(self.current_project_id)
         self.project_diagram_tab.set_project_id(self.current_project_id)
 
@@ -405,8 +406,9 @@ class MainWindow(QMainWindow):
     @Slot()
     def closeEvent(self, event):
         should_minimize = self.config.get("minimize_to_tray", True)
+        tray_usable = self.tray_available and self.tray_icon is not None and self.tray_icon.isVisible()
 
-        if should_minimize and self.tray_icon.isVisible():
+        if should_minimize and tray_usable:
             self.hide()
             self.tray_icon.showMessage(
                 "GNU Mau",
@@ -414,14 +416,20 @@ class MainWindow(QMainWindow):
                 QSystemTrayIcon.Information,
                 2000
             )
-            event.ignore() 
+            event.ignore()
         else:
-            self.client.close() 
+            try:
+                self.client.close()
+            except Exception as e:
+                print(f"Error closing the database: {e}")
             event.accept()
+            # Make sure the process ends even when the tray is unavailable
+            QApplication.quit()
 
     @Slot()
     def changeEvent(self, event):
-        if event.type() == QEvent.WindowStateChange and self.isMinimized():
+        if (event.type() == QEvent.WindowStateChange and self.isMinimized()
+                and self.tray_available and self.tray_icon is not None):
             self.tray_icon.showMessage(
                 "Minimized to Tray",
                 "The application has been minimized to the system tray",

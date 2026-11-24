@@ -7,3 +7,7 @@ build
 build/*
 notes/
 plugins/
+# Podman/Docker persistent data (created by start.sh)
+.docker-data/
+backup_before_update/
+backup_before_restore/

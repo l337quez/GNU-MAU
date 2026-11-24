@@ -7,14 +7,14 @@ authors = [
 ]
 license = {text = "GPL V3"}
 readme = "README.md"
-requires-python = "3.11.4"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "pyside6 (==6.5.0)",
-    "gkeepapi (==0.17.0)",
     "markdown2 (>=2.5.4,<3.0.0)",
     "mongita (>=1.2.0,<2.0.0)",
-    "numpy (<2)",
-    "dotenv (>=0.9.9,<0.10.0)",
+    # mongita exposes the bson API through pymongo; declare it explicitly
+    "pymongo (>=4.0,<5.0)",
+    "python-dotenv (>=1.0,<2.0)",
     "qtpynodeeditor (>=0.3.3,<0.4.0)"
 ]
 
