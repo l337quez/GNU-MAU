@@ -52,8 +52,8 @@ if load_dotenv is not None:
     load_dotenv()
 
 # Tamaño cuadrado uniforme para los controles del rail y sus iconos.
-SQUARE_SIZE = 44
-ICON_SIZE = 36
+SQUARE_SIZE = 48
+ICON_SIZE = 40
 ICON_MARGIN = 2
 
 
@@ -505,10 +505,14 @@ class MainWindow(QMainWindow):
             self.create_project_button.setStyleSheet("""
                 QPushButton {
                     background-color: #34495e;
-                    border: 1px solid #2c3e50;
+                    border: none;
                     border-radius: 6px;
                     padding: 0px;
                     margin: 0px;
+                    min-width: 48px;
+                    max-width: 48px;
+                    min-height: 48px;
+                    max-height: 48px;
                 }
                 QPushButton:hover {
                     background-color: #2c3e50;
@@ -518,15 +522,18 @@ class MainWindow(QMainWindow):
 
             compact_icon_style = """
                 QPushButton {
-                    background-color: transparent;
-                    border: 1px solid rgba(128, 128, 128, 0.35);
+                    background-color: rgba(128, 128, 128, 0.12);
+                    border: none;
                     border-radius: 6px;
                     padding: 0px;
                     margin: 0px;
+                    min-width: 48px;
+                    max-width: 48px;
+                    min-height: 48px;
+                    max-height: 48px;
                 }
                 QPushButton:hover {
                     background-color: rgba(128, 128, 128, 0.25);
-                    border-color: rgba(128, 128, 128, 0.6);
                 }
             """
 
@@ -576,12 +583,13 @@ class MainWindow(QMainWindow):
                     border: none;
                 }
                 QListWidget::item {
-                    width: 44px;
-                    height: 44px;
+                    width: 48px;
+                    height: 48px;
                     margin: 2px 0px;
                     padding: 0px;
                     border: none;
                     border-bottom: none;
+                    border-radius: 6px;
                     color: transparent;
                 }
                 QListWidget::item:selected {
@@ -616,7 +624,7 @@ class MainWindow(QMainWindow):
             # Ancho simétrico y sin scroll horizontal
             self.project_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            self.sidebar_layout.setContentsMargins(4, 4, 4, 4)
+            self.sidebar_layout.setContentsMargins(2, 4, 2, 4)
             self.sidebar_layout.setSpacing(6)
             self.dock_widget.setMinimumWidth(52)
             self.dock_widget.setMaximumWidth(52)

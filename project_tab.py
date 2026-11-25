@@ -11,9 +11,9 @@ from utils import get_resource_path, make_relative_path, open_system_terminal, o
 from i18n import tr
 
 # Tamaño cuadrado uniforme del botón de preview y de su lienzo de icono.
-SQUARE_SIZE = 64
-ICON_SIZE = 56
-ICON_MARGIN = 4
+SQUARE_SIZE = 48
+ICON_SIZE = 42
+ICON_MARGIN = 2
 
 
 def make_square_pixmap(source, canvas=ICON_SIZE, margin=ICON_MARGIN):
@@ -41,7 +41,7 @@ def make_square_pixmap(source, canvas=ICON_SIZE, margin=ICON_MARGIN):
 
 
 def square_icon(source):
-    """QIcon cuadrado (56x56) para el preview del proyecto."""
+    """QIcon cuadrado (42x42) para el preview del proyecto."""
     return QIcon(make_square_pixmap(source, ICON_SIZE, ICON_MARGIN))
 
 class ProjectTab(QWidget):
@@ -61,17 +61,21 @@ class ProjectTab(QWidget):
         self.change_icon_button.clicked.connect(self.change_icon)
         self.change_icon_button.setStyleSheet("""
             QPushButton {
-                background-color: rgba(128, 128, 128, 0.05);
-                border: 1px solid rgba(128, 128, 128, 0.35);
+                background-color: rgba(128, 128, 128, 0.10);
+                border: none;
                 border-radius: 6px;
                 padding: 0px;
+                margin: 0px;
+                min-width: 48px;
+                max-width: 48px;
+                min-height: 48px;
+                max-height: 48px;
             }
             QPushButton:hover {
-                background-color: rgba(128, 128, 128, 0.15);
-                border-color: rgba(128, 128, 128, 0.6);
+                background-color: rgba(128, 128, 128, 0.20);
             }
             QPushButton:disabled {
-                border: 1px dashed rgba(128, 128, 128, 0.35);
+                background-color: rgba(128, 128, 128, 0.04);
             }
         """)
         self.icon_movie = None

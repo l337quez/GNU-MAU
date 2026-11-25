@@ -13,8 +13,6 @@ QPushButton {
     border: 1px solid #007acc;
     border-radius: 4px;        /* Reducido un poco para que encaje mejor */
     padding: 2px;              /* Reducimos el padding al mínimo para que no empuje el borde */
-    min-height: 18px;          /* Bajamos la altura mínima de 22px a 18px */
-    max-height: 22px;          /* Añadimos una altura máxima para que no crezca de más */
     min-width: 24px;           /* Un poco más de ancho para que el icono respire */
 }
 
