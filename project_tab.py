@@ -3,11 +3,46 @@ import os
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, QTextEdit, QPushButton,
                                QListWidgetItem, QHBoxLayout, QFileDialog, QTableWidget, QTableWidgetItem,
                                QHeaderView, QCompleter, QApplication, QCheckBox, QComboBox)
-from PySide6.QtCore import Slot, Qt, QStringListModel
+from PySide6.QtCore import Slot, Qt, QStringListModel, QSize
 import json
-from PySide6.QtGui import QIcon, QClipboard
+from PySide6.QtGui import QIcon, QClipboard, QPixmap, QMovie, QPainter
 from bson.objectid import ObjectId
 from utils import get_resource_path, make_relative_path, open_system_terminal, open_browser
+from i18n import tr
+
+# Tamaño cuadrado uniforme del botón de preview y de su lienzo de icono.
+SQUARE_SIZE = 64
+ICON_SIZE = 56
+ICON_MARGIN = 4
+
+
+def make_square_pixmap(source, canvas=ICON_SIZE, margin=ICON_MARGIN):
+    """
+    Centra un pixmap en un lienzo cuadrado transparente sin recortar ni
+    deformar la imagen (Qt.KeepAspectRatio + margen interno).
+    """
+    if source is None or source.isNull():
+        return QPixmap()
+
+    target = QPixmap(canvas, canvas)
+    target.fill(Qt.transparent)
+
+    inner = max(1, canvas - margin * 2)
+    scaled = source.scaled(inner, inner, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+    painter = QPainter(target)
+    painter.drawPixmap(
+        (canvas - scaled.width()) // 2,
+        (canvas - scaled.height()) // 2,
+        scaled,
+    )
+    painter.end()
+    return target
+
+
+def square_icon(source):
+    """QIcon cuadrado (56x56) para el preview del proyecto."""
+    return QIcon(make_square_pixmap(source, ICON_SIZE, ICON_MARGIN))
 
 class ProjectTab(QWidget):
     def __init__(self, main_window):
@@ -15,53 +50,79 @@ class ProjectTab(QWidget):
         self.main_window = main_window
         layout = QVBoxLayout()
 
-        # ── Name & Description ──────────────────────────────────────────────
-        name_label = QLabel("Project name")
-        self.name_input = QLineEdit()
-        layout.addWidget(name_label)
-        layout.addWidget(self.name_input)
-
-        description_label = QLabel("Project description")
-        self.description_input = QTextEdit()
-        self.description_input.setMaximumHeight(60)
-        layout.addWidget(description_label)
-        layout.addWidget(self.description_input)
-
-        # ── Toolbar: Icon | Key | Value | Action | Category ─────────────────
-        self.toolbar_layout = QHBoxLayout()
-        self.toolbar_layout.setSpacing(8)
-
-        self.change_icon_button = QPushButton("🖼️ Gif")
-        self.change_icon_button.setFixedWidth(65)
+        # ── Header: preview clicable del icono + nombre ─────────────────────
+        self.change_icon_button = QPushButton()
+        self.change_icon_button.setFixedSize(SQUARE_SIZE, SQUARE_SIZE)
+        self.change_icon_button.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        self.change_icon_button.setText("")
+        self.change_icon_button.setCursor(Qt.PointingHandCursor)
+        self.change_icon_button.setToolTip(tr("btn_gif"))
         self.change_icon_button.setEnabled(False)
         self.change_icon_button.clicked.connect(self.change_icon)
         self.change_icon_button.setStyleSheet("""
-            QPushButton { padding: 6px; border-radius: 4px; border: 1px solid #ccc; }
-            QPushButton:disabled { background-color: #f0f0f0; color: #888; border: 1px solid #ddd; }
+            QPushButton {
+                background-color: rgba(128, 128, 128, 0.05);
+                border: 1px solid rgba(128, 128, 128, 0.35);
+                border-radius: 6px;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: rgba(128, 128, 128, 0.15);
+                border-color: rgba(128, 128, 128, 0.6);
+            }
+            QPushButton:disabled {
+                border: 1px dashed rgba(128, 128, 128, 0.35);
+            }
         """)
+        self.icon_movie = None
+
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(10)
+        header_layout.addWidget(self.change_icon_button, 0, Qt.AlignTop)
+
+        name_layout = QVBoxLayout()
+        name_layout.setSpacing(2)
+        self.name_label = QLabel(tr("project_name"))
+        self.name_input = QLineEdit()
+        name_layout.addWidget(self.name_label)
+        name_layout.addWidget(self.name_input)
+        header_layout.addLayout(name_layout, 1)
+
+        layout.addLayout(header_layout)
+
+        self._update_project_icon_preview(None)
+
+        self.description_label = QLabel(tr("project_description"))
+        self.description_input = QTextEdit()
+        self.description_input.setMaximumHeight(60)
+        layout.addWidget(self.description_label)
+        layout.addWidget(self.description_input)
+
+        # ── Toolbar: Key | Value | Action | Category ────────────────────────
+        self.toolbar_layout = QHBoxLayout()
+        self.toolbar_layout.setSpacing(8)
 
         self.info_name_input = QLineEdit()
-        self.info_name_input.setPlaceholderText("Key...")
+        self.info_name_input.setPlaceholderText(tr("key_placeholder"))
 
         self.info_value_input = QLineEdit()
-        self.info_value_input.setPlaceholderText("Value...")
+        self.info_value_input.setPlaceholderText(tr("value_placeholder"))
 
         self.action_selector = QComboBox()
-        self.action_selector.addItems(["🚫 None", "💻 Terminal", "🌐 Browser"])
+        self.action_selector.addItems([tr("action_none"), tr("action_terminal"), tr("action_browser")])
         self.action_selector.setFixedWidth(120)
 
         # Category selector — editable para escribir nueva categoría
         self.category_selector = QComboBox()
         self.category_selector.setEditable(True)
         self.category_selector.setInsertPolicy(QComboBox.NoInsert)
-        self.category_selector.lineEdit().setPlaceholderText("Category")
+        self.category_selector.lineEdit().setPlaceholderText(tr("category_placeholder"))
         self.category_selector.setFixedWidth(128)
         self._cat_completer = QCompleter(self)
         self._cat_completer.setCaseSensitivity(Qt.CaseInsensitive)
         self._cat_completer.setFilterMode(Qt.MatchContains)
         self.category_selector.setCompleter(self._cat_completer)
 
-        self.toolbar_layout.addWidget(self.change_icon_button)
         self.toolbar_layout.addWidget(self.info_name_input)
         self.toolbar_layout.addWidget(self.info_value_input)
         self.toolbar_layout.addWidget(self.action_selector)
@@ -71,14 +132,14 @@ class ProjectTab(QWidget):
 
         # ── Table ────────────────────────────────────────────────────────────
         self.additional_info_table = QTableWidget(0, 3)
-        self.additional_info_table.setHorizontalHeaderLabels(["Key", "Value", "Actions"])
+        self.additional_info_table.setHorizontalHeaderLabels([tr("table_key"), tr("table_value"), tr("table_actions")])
         self.additional_info_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.additional_info_table.setAlternatingRowColors(True)
         self.additional_info_table.verticalHeader().setVisible(False)
         layout.addWidget(self.additional_info_table)
 
         # ── Save button (bottom) ──────────────────────────────────────────────
-        self.save_all_button = QPushButton("💾 Save")
+        self.save_all_button = QPushButton(tr("btn_save"))
         self.save_all_button.setStyleSheet("""
             QPushButton {
                 font-weight: bold;
@@ -221,12 +282,12 @@ class ProjectTab(QWidget):
         icon_path, _ = QFileDialog.getOpenFileName(self, "Select Icon", initial_dir, "Images (*.gif *.png *.ico *.webp)")
 
         if icon_path:
+            stored_path = make_relative_path(icon_path)
             if hasattr(self.main_window, 'current_project_id') and self.main_window.current_project_id:
                 try:
                     p_id = self.main_window.current_project_id
                     if isinstance(p_id, str):
                         p_id = ObjectId(p_id)
-                    stored_path = make_relative_path(icon_path)
                     result = self.main_window.db.projects.update_one(
                         {"_id": p_id},
                         {"$set": {"icon_path": stored_path}}
@@ -244,6 +305,62 @@ class ProjectTab(QWidget):
                 self.main_window.current_project_item.setData(Qt.UserRole + 1, icon_path)
 
             self.main_window.update_project_icon(self.name_input.text(), icon_path)
+            # Refrescar la previsualización de la cabecera (GIF o imagen)
+            self._update_project_icon_preview(stored_path)
+
+    def _stop_icon_movie(self):
+        """Detiene y libera la animación actual de la previsualización."""
+        if self.icon_movie is not None:
+            try:
+                self.icon_movie.frameChanged.disconnect(self._on_icon_frame)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                self.icon_movie.stop()
+            except Exception:
+                pass
+            self.icon_movie = None
+
+    def _on_icon_frame(self, _frame):
+        """Actualiza el icono del botón de preview con el frame actual del GIF."""
+        if self.icon_movie is not None:
+            pixmap = self.icon_movie.currentPixmap()
+            if not pixmap.isNull():
+                self.change_icon_button.setIcon(square_icon(pixmap))
+
+    def _update_project_icon_preview(self, icon_path):
+        """Muestra el icono/GIF del proyecto en el botón de preview."""
+        self._stop_icon_movie()
+
+        if not icon_path:
+            icon_path = "assets/project_images/default_icon.png"
+
+        resolved = icon_path if os.path.isabs(icon_path) else get_resource_path(icon_path)
+        if not os.path.exists(resolved):
+            resolved = get_resource_path("assets/project_images/default_icon.png")
+        if not os.path.exists(resolved):
+            self.change_icon_button.setIcon(QIcon())
+            return
+
+        is_gif = str(icon_path).lower().endswith(".gif") or resolved.lower().endswith(".gif")
+        if is_gif:
+            movie = QMovie(resolved)
+            if movie.isValid():
+                self.icon_movie = movie
+                movie.frameChanged.connect(self._on_icon_frame)
+                movie.start()
+                self._on_icon_frame(0)
+                return
+
+        pixmap = QPixmap(resolved)
+        if not pixmap.isNull():
+            self.change_icon_button.setIcon(square_icon(pixmap))
+        else:
+            self.change_icon_button.setIcon(QIcon())
+
+    def reset_icon_preview(self):
+        """Vuelve al icono por defecto (por ejemplo al crear un proyecto)."""
+        self._update_project_icon_preview(None)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Load / display
@@ -255,6 +372,14 @@ class ProjectTab(QWidget):
         self.name_input.setReadOnly(False)
         self.description_input.setReadOnly(False)
         self.change_icon_button.setEnabled(True)
+
+        # Previsualización del icono/GIF del proyecto seleccionado
+        icon_path = "assets/project_images/default_icon.png"
+        current_item = getattr(self.main_window, "current_project_item", None)
+        if current_item is not None:
+            icon_path = current_item.data(Qt.UserRole + 1) or icon_path
+        self._update_project_icon_preview(icon_path)
+
         self.update_additional_info_table()
         self._refresh_category_selector()
         self._sync_info_tab_filter()
@@ -321,3 +446,17 @@ class ProjectTab(QWidget):
     def copy_to_clipboard(self, text):
         clipboard = QApplication.clipboard()
         clipboard.setText(text)
+
+    def retranslate_ui(self):
+        from i18n import tr
+        self.name_label.setText(tr("project_name"))
+        self.description_label.setText(tr("project_description"))
+        self.info_name_input.setPlaceholderText(tr("key_placeholder"))
+        self.info_value_input.setPlaceholderText(tr("value_placeholder"))
+        self.category_selector.lineEdit().setPlaceholderText(tr("category_placeholder"))
+        self.additional_info_table.setHorizontalHeaderLabels([
+            tr("table_key"), tr("table_value"), tr("table_actions")
+        ])
+        self.save_all_button.setText(tr("btn_save"))
+        self.change_icon_button.setText("")
+        self.change_icon_button.setToolTip(tr("btn_gif"))

@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout, QFrame, QPushButton)
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt
 import os
@@ -13,6 +13,28 @@ class AboutTab(QWidget):
         main_layout.setAlignment(Qt.AlignCenter)
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Barra superior con botón Volver
+        top_bar = QHBoxLayout()
+        self.back_button = QPushButton("⬅ Back to Projects")
+        self.back_button.setCursor(Qt.PointingHandCursor)
+        self.back_button.setStyleSheet("""
+            QPushButton {
+                background-color: #34495e;
+                color: white;
+                border-radius: 4px;
+                padding: 6px 14px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #2c3e50;
+            }
+        """)
+        self.back_button.clicked.connect(self.main_window.show_project_tabs_view)
+        top_bar.addWidget(self.back_button)
+        top_bar.addStretch()
+        main_layout.addLayout(top_bar)
 
         header_frame = QFrame()
         header_layout = QVBoxLayout(header_frame)

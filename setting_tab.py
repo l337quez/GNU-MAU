@@ -14,6 +14,7 @@ import zipfile, tarfile, tempfile
 from utils import (get_app_dir, get_config_path, get_mongita_dir,
                    get_resource_path, get_storage_dir, load_config as load_app_config,
                    normalize_theme, save_config as save_app_config)
+from i18n import tr, set_language, get_language, get_supported_languages
 
 REPO_VERSION_URL = "https://raw.githubusercontent.com/l337quez/GNU-MAU/main/version.txt"
 
@@ -144,13 +145,55 @@ class SettingTab(QWidget):
         super().__init__()
         self.main_window = main_window
         self.info_layout = QVBoxLayout()
+
+        # Barra superior con botón volver a proyectos
+        top_nav_layout = QHBoxLayout()
+        self.back_button = QPushButton(tr("back_to_projects"))
+        self.back_button.setCursor(Qt.PointingHandCursor)
+        self.back_button.setStyleSheet("""
+            QPushButton {
+                background-color: #34495e;
+                color: white;
+                border-radius: 4px;
+                padding: 6px 14px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #2c3e50;
+            }
+        """)
+        self.back_button.clicked.connect(self.main_window.show_project_tabs_view)
+        top_nav_layout.addWidget(self.back_button)
+        
+        self.title_label = QLabel(tr("settings_title"))
+        self.title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-left: 10px;")
+        top_nav_layout.addWidget(self.title_label)
+        top_nav_layout.addStretch()
+        self.info_layout.addLayout(top_nav_layout)
+
+        # Fila de selectores: Theme y Language
+        selectors_layout = QHBoxLayout()
+        selectors_layout.setSpacing(25)
+
         self.theme_layout = QHBoxLayout()
-        self.theme_layout.addWidget(QLabel("Theme:"))
+        self.theme_label = QLabel(tr("theme_label"))
         self.theme_combo = QComboBox()
+        self.theme_layout.addWidget(self.theme_label)
         self.theme_layout.addWidget(self.theme_combo)
         self.theme_combo.currentIndexChanged.connect(self.change_theme)
-        
-        self.info_layout.addLayout(self.theme_layout)
+        selectors_layout.addLayout(self.theme_layout)
+
+        self.lang_layout = QHBoxLayout()
+        self.lang_label = QLabel(tr("language_label"))
+        self.lang_combo = QComboBox()
+        self.lang_layout.addWidget(self.lang_label)
+        self.lang_layout.addWidget(self.lang_combo)
+        self.lang_combo.currentIndexChanged.connect(self.change_language)
+        selectors_layout.addLayout(self.lang_layout)
+
+        selectors_layout.addStretch()
+        self.info_layout.addLayout(selectors_layout)
 
         # Map display names to internal names
         self.theme_map = {
@@ -161,28 +204,25 @@ class SettingTab(QWidget):
         }
         self.reverse_theme_map = {v: k for k, v in self.theme_map.items()}
 
-        sidebar_group = QGroupBox("Sidebar position")
+        self.sidebar_group = QGroupBox(tr("sidebar_position"))
         sidebar_layout = QHBoxLayout()
 
-        # Definimos las posiciones usando las constantes de Qt
-        # Qt.LeftDockWidgetArea = 0x1 (1)
-        # Qt.RightDockWidgetArea = 0x2 (2)
-        # Qt.TopDockWidgetArea = 0x4 (4)
-        # Qt.BottomDockWidgetArea = 0x8 (8)
         positions = [
-            ("Left", Qt.LeftDockWidgetArea),
-            ("Right", Qt.RightDockWidgetArea),
-            ("Top", Qt.TopDockWidgetArea),
-            ("Bottom", Qt.BottomDockWidgetArea)
+            ("pos_left", "Left", Qt.LeftDockWidgetArea),
+            ("pos_right", "Right", Qt.RightDockWidgetArea),
+            ("pos_top", "Top", Qt.TopDockWidgetArea),
+            ("pos_bottom", "Bottom", Qt.BottomDockWidgetArea)
         ]
 
-        for text, pos_enum in positions:
-            btn = QPushButton(text)
+        self.pos_buttons = []
+        for key, text, pos_enum in positions:
+            btn = QPushButton(tr(key, text))
             btn.clicked.connect(lambda checked=False, p=pos_enum: self.change_sidebar_pos(p))
             sidebar_layout.addWidget(btn)
+            self.pos_buttons.append((btn, key, text))
 
-        sidebar_group.setLayout(sidebar_layout)
-        self.info_layout.addWidget(sidebar_group)
+        self.sidebar_group.setLayout(sidebar_layout)
+        self.info_layout.addWidget(self.sidebar_group)
 
         # Restoration Section
         db_group = QGroupBox("Database and storage restoration")
@@ -234,6 +274,12 @@ class SettingTab(QWidget):
         self.tray_checkbox.toggled.connect(self.toggle_tray_behavior)
         self.info_layout.addWidget(self.tray_checkbox)
 
+        # AI Integration checkbox
+        self.ai_checkbox = QCheckBox("Allow AI to create and manage tasks (AI Integration)")
+        self.ai_checkbox.setToolTip("Enables AI assistants to create and manage tasks and notes in GNU Mau.")
+        self.ai_checkbox.toggled.connect(self.toggle_ai_integration)
+        self.info_layout.addWidget(self.ai_checkbox)
+
         # Reusable progress bar
         self.progress_bar = CustomProgressBar()
         self.info_layout.addWidget(self.progress_bar)
@@ -253,8 +299,14 @@ class SettingTab(QWidget):
         self.tray_checkbox.blockSignals(True)
         self.tray_checkbox.setChecked(bool(tray_setting))
         self.tray_checkbox.blockSignals(False)
+
+        ai_setting = config.get("enable_ai_integration", True)
+        self.ai_checkbox.blockSignals(True)
+        self.ai_checkbox.setChecked(bool(ai_setting))
+        self.ai_checkbox.blockSignals(False)
         
         self.load_available_themes()
+        self.load_available_languages()
         
         # Set selection in combo box without triggering change_theme twice
         display_name = self.reverse_theme_map.get(self.current_theme, self.current_theme)
@@ -298,6 +350,43 @@ class SettingTab(QWidget):
                     if self.theme_combo.findText(display_name) == -1:
                         self.theme_combo.addItem(display_name)
         self.theme_combo.blockSignals(False)
+
+    def load_available_languages(self):
+        self.lang_combo.blockSignals(True)
+        self.lang_combo.clear()
+        supported = get_supported_languages()
+        current = get_language()
+        current_idx = 0
+        for i, (code, name) in enumerate(supported.items()):
+            self.lang_combo.addItem(name, code)
+            if code == current:
+                current_idx = i
+        self.lang_combo.setCurrentIndex(current_idx)
+        self.lang_combo.blockSignals(False)
+
+    def change_language(self, index):
+        code = self.lang_combo.itemData(index) if index >= 0 else self.lang_combo.currentData()
+        if code:
+            set_language(code)
+            self.save_config({"language": code})
+            self.retranslate_ui()
+            if hasattr(self.main_window, "retranslate_ui"):
+                self.main_window.retranslate_ui()
+
+    def retranslate_ui(self):
+        self.back_button.setText(tr("back_to_projects"))
+        self.title_label.setText(tr("settings_title"))
+        self.theme_label.setText(tr("theme_label"))
+        self.lang_label.setText(tr("language_label"))
+        if hasattr(self, "sidebar_group"):
+            self.sidebar_group.setTitle(tr("sidebar_position"))
+        if hasattr(self, "pos_buttons"):
+            for btn, key, default in self.pos_buttons:
+                btn.setText(tr(key, default))
+        self.tray_checkbox.setText(tr("minimize_to_tray"))
+        self.ai_checkbox.setText(tr("allow_ai"))
+        self.ai_checkbox.setToolTip(tr("allow_ai_tooltip"))
+        self.check_update_btn.setText(tr("check_updates"))
 
     def apply_theme(self, theme_name):
         """Apply a theme through MainWindow so both stay consistent."""
@@ -477,6 +566,13 @@ class SettingTab(QWidget):
         if hasattr(self.main_window, 'config'):
             self.main_window.config["minimize_to_tray"] = checked
         self.status_text.append(f"Minimize to tray: {'Enabled' if checked else 'Disabled'}")
+
+    @Slot(bool)
+    def toggle_ai_integration(self, checked):
+        self.save_config({"enable_ai_integration": checked})
+        if hasattr(self.main_window, 'config'):
+            self.main_window.config["enable_ai_integration"] = checked
+        self.status_text.append(f"AI Integration: {'Enabled' if checked else 'Disabled'}")
 
 
     def check_updates(self):

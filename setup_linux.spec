@@ -6,6 +6,7 @@ base_path = os.path.abspath(SPECPATH)
 datas = [
     (os.path.join(base_path, 'assets'), 'assets'),
     (os.path.join(base_path, 'themes'), 'themes'),
+    (os.path.join(base_path, 'fontawesome-free-6.5.2-desktop'), 'fontawesome-free-6.5.2-desktop'),
 ]
 
 hiddenimports = [
@@ -17,6 +18,8 @@ hiddenimports = [
     'dotenv',
     'gkeepapi',
     'qtpynodeeditor',
+    'i18n',
+    'kanban_view',
 ]
 
 a = Analysis(

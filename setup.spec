@@ -14,6 +14,7 @@ a = Analysis(
     datas=[
         (os.path.join(base_path, 'assets'), 'assets'),
         (os.path.join(base_path, 'themes'), 'themes'),
+        (os.path.join(base_path, 'fontawesome-free-6.5.2-desktop'), 'fontawesome-free-6.5.2-desktop'),
     ],
     hiddenimports=[
         'PySide6.QtXml', 

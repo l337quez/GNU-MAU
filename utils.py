@@ -1,43 +1,13 @@
+import sys, os, subprocess, webbrowser
 import json
-import os
-import shutil
-import subprocess
-import sys
-import webbrowser
+from PySide6.QtGui import QTextCursor, QTextCharFormat, QTextBlockFormat 
 
-from PySide6.QtGui import QTextCursor, QTextCharFormat, QTextBlockFormat
-
-APP_NAME = "GNU Mau"
-
-# Default application configuration. Any value missing from the user's
-# config.json is completed from here so the rest of the code can rely on it.
-DEFAULT_CONFIG = {
-    "theme": "Light Theme",
-    "db_name": "projects_db",
-    "window_title": APP_NAME,
-    "window_geometry": [300, 300, 800, 600],
-    "sidebar_position": 1,  # Qt.LeftDockWidgetArea
-    "minimize_to_tray": True,
-}
-
-# Accepted theme spellings (legacy configs used "Dark Theme" or "theme_text").
-THEME_ALIASES = {
-    "dark": "dark_theme",
-    "dark_theme": "dark_theme",
-    "Dark Theme": "dark_theme",
-    "light": "Light Theme",
-    "light_theme": "Light Theme",
-    "Light": "Light Theme",
-    "Light Theme": "Light Theme",
-    "arctic_mist": "arctic_mist",
-    "Arctic Mist": "arctic_mist",
-    "amber_dusk": "amber_dusk",
-    "Amber Dusk": "amber_dusk",
-    "solarized_light": "solarized_light",
-    "Solarized Light": "solarized_light",
-    "tokyo_night": "tokyo_night",
-    "Tokyo Night": "tokyo_night",
-}
+# Optional dotenv import so the app can start even if python-dotenv
+# is not yet installed in the active environment.
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ImportError:
+    load_dotenv = None  # Handled in main.py
 
 
 def is_windows():
@@ -62,49 +32,77 @@ def get_app_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def get_resource_base():
+    """
+    Directory that holds read-only resources (assets, themes).
+    Inside a PyInstaller bundle resources live in sys._MEIPASS; when running
+    from source they are next to this file, never relative to the CWD.
+    """
+    if getattr(sys, 'frozen', False):
+        return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.executable)))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 def get_resource_path(relative_path):
     """
-    Get the absolute path of resources, compatible with PyInstaller (sys._MEIPASS / _internal)
-    and running from source, independent of CWD.
+    Get the absolute path of the resources, compatible with PyInstaller and
+    independent from the current working directory.
     """
     if not relative_path:
         return ""
-
-    # Normalize Windows backslashes
     norm_path = relative_path.replace("\\", "/")
-
-    # If the path is a full Windows/Linux path containing 'assets/', extract the relative 'assets/...' part
     if "assets/" in norm_path:
         relative_path = "assets/" + norm_path.split("assets/", 1)[1]
 
-    if getattr(sys, 'frozen', False):
-        # 1. First check inside PyInstaller temporary directory (sys._MEIPASS)
-        meipass_path = os.path.join(getattr(sys, '_MEIPASS', ''), relative_path)
-        if os.path.exists(meipass_path):
-            return meipass_path
-
-        # 2. Check next to executable or inside _internal/
-        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-        direct_path = os.path.join(exe_dir, relative_path)
-        if os.path.exists(direct_path):
-            return direct_path
-
-        internal_path = os.path.join(exe_dir, "_internal", relative_path)
-        if os.path.exists(internal_path):
-            return internal_path
-
-        if os.path.exists(relative_path):
-            return relative_path
-
-        return meipass_path
-    else:
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        cand = os.path.join(base_path, relative_path)
-        if os.path.exists(cand):
-            return cand
-        if os.path.exists(relative_path):
-            return relative_path
+    # 1. Check resource base (sys._MEIPASS or source directory)
+    cand = os.path.join(get_resource_base(), relative_path)
+    if os.path.exists(cand):
         return cand
+
+    # 2. Check next to executable or in _internal
+    if getattr(sys, 'frozen', False):
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        direct = os.path.join(exe_dir, relative_path)
+        if os.path.exists(direct):
+            return direct
+        internal = os.path.join(exe_dir, "_internal", relative_path)
+        if os.path.exists(internal):
+            return internal
+
+    return cand
+
+
+def get_fa_icon(name, color="#888888", size=20):
+    """
+    Renders a Font Awesome solid SVG icon to a QIcon with the specified color and size.
+    """
+    from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor
+    from PySide6.QtSvg import QSvgRenderer
+
+    relative_svg = os.path.join("fontawesome-free-6.5.2-desktop", "svgs", "solid", f"{name}.svg")
+    svg_path = get_resource_path(relative_svg)
+
+    if not os.path.exists(svg_path):
+        return QIcon()
+
+    try:
+        with open(svg_path, "r", encoding="utf-8") as f:
+            svg_content = f.read()
+
+        # Inyectar fill con el color deseado
+        if "<svg " in svg_content:
+            svg_content = svg_content.replace("<svg ", f'<svg fill="{color}" ', 1)
+
+        renderer = QSvgRenderer(svg_content.encode("utf-8"))
+        pix = QPixmap(size, size)
+        pix.fill(QColor("transparent"))
+        painter = QPainter(pix)
+        renderer.render(painter)
+        painter.end()
+        return QIcon(pix)
+    except Exception as e:
+        print(f"Error cargando icono Font Awesome {name}: {e}")
+        return QIcon()
 
 
 def get_data_dir(folder_name=None):
@@ -114,7 +112,6 @@ def get_data_dir(folder_name=None):
 
     For PyInstaller onedir builds the historical location is ``_internal``
     (next to the executable), so existing installations keep their data.
-    If folder_name is provided, returns the subfolder path.
     """
     custom = os.environ.get("GNU_MAU_DATA_DIR")
     if custom:
@@ -122,15 +119,10 @@ def get_data_dir(folder_name=None):
     elif getattr(sys, 'frozen', False):
         exe_dir = os.path.dirname(os.path.abspath(sys.executable))
         internal_dir = os.path.join(exe_dir, "_internal")
-        if os.path.isdir(internal_dir):
-            base = internal_dir
-        elif os.access(exe_dir, os.W_OK):
-            base = exe_dir
-        else:
-            base = os.path.join(os.path.expanduser("~"), ".myapp")
+        base = internal_dir if os.path.isdir(internal_dir) else exe_dir
     else:
         base = get_app_dir()
-
+    
     if folder_name:
         target = os.path.join(base, folder_name)
         os.makedirs(target, exist_ok=True)
@@ -139,11 +131,15 @@ def get_data_dir(folder_name=None):
 
 
 def get_storage_dir():
-    return get_data_dir("storage")
+    target = os.path.join(get_data_dir(), "storage")
+    os.makedirs(target, exist_ok=True)
+    return target
 
 
 def get_mongita_dir():
-    return get_data_dir("mongita_data")
+    target = os.path.join(get_data_dir(), "mongita_data")
+    os.makedirs(target, exist_ok=True)
+    return target
 
 
 def get_config_dir():
@@ -169,104 +165,113 @@ def ensure_dir(path):
         os.makedirs(path, exist_ok=True)
         return True
     except OSError as e:
-        print(f"Error al crear el directorio {path}: {e}")
+        print(f"Error creating directory {path}: {e}")
         return False
 
 
 def normalize_theme(theme_name):
-    """Return the internal theme name (file name without .qss)."""
+    """
+    Normalize theme names so legacy configurations ('dark_theme.qss',
+    'Dark Theme', 'dark_theme') map to the canonical file basename ('dark_theme').
+    """
     if not theme_name:
-        return "Light Theme"
-    return THEME_ALIASES.get(str(theme_name).strip(), str(theme_name).strip())
+        return "light_theme"
 
+    name = str(theme_name).strip()
+    if name.lower().endswith(".qss"):
+        name = name[:-4]
 
-def normalize_config(config):
-    """
-    Merge a raw config with the defaults, dropping obsolete keys and
-    migrating the old ``dark_mode`` flag to the canonical ``theme`` key.
-    """
-    cfg = dict(DEFAULT_CONFIG)
-    raw_theme = None
-    if isinstance(config, dict):
-        raw_theme = config.get("theme")
-        cfg.update(config)
-
-    legacy_dark_mode = cfg.pop("dark_mode", None)
-    cfg.pop("theme_text", None)
-
-    if not raw_theme:
-        cfg["theme"] = "dark_theme" if legacy_dark_mode else "Light Theme"
-    cfg["theme"] = normalize_theme(cfg["theme"])
-
-    return cfg
-
-
-def _read_config_file():
-    path = get_config_path()
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError) as e:
-        print(f"No se pudo leer {path}: {e}")
-        return {}
-
-
-def _write_config(config):
-    path = get_config_path()
-    tmp_path = f"{path}.tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=4)
-    os.replace(tmp_path, path)
+    canonical = {
+        "arctic mist": "arctic_mist",
+        "arctic_mist": "arctic_mist",
+        "amber dusk": "amber_dusk",
+        "amber_dusk": "amber_dusk",
+        "dark theme": "dark_theme",
+        "dark_theme": "dark_theme",
+        "light theme": "light_theme",
+        "light_theme": "light_theme",
+        "solarized light": "solarized_light",
+        "solarized_light": "solarized_light",
+        "tokyo night": "tokyo_night",
+        "tokyo_night": "tokyo_night",
+    }
+    return canonical.get(name.lower(), name)
 
 
 def load_config():
-    """
-    Load the configuration, migrating/normalizing it on the fly.
-    Returns a dict that always contains every DEFAULT_CONFIG key.
-    """
-    raw = _read_config_file()
-    config = normalize_config(raw)
-    if raw != config:
-        try:
-            _write_config(config)
-        except OSError as e:
-            print(f"No se pudo guardar la configuración normalizada: {e}")
-    return config
+    """Load configuration from disk with safe defaults."""
+    defaults = {
+        "theme": "light_theme",
+        "minimize_to_tray": True,
+        "enable_ai_integration": True,
+        "sidebar_position": 1,
+        "sidebar_collapsed": False,
+        "db_name": "projects_db",
+        "language": "en",
+    }
+    path = get_config_path()
+    if not os.path.exists(path):
+        return defaults
 
-
-def save_config(updated_data=None):
-    """Merge ``updated_data`` into the existing config and persist it."""
-    config = normalize_config(_read_config_file())
-    if updated_data:
-        config.update(updated_data)
-    config = normalize_config(config)
     try:
-        _write_config(config)
-    except OSError as e:
-        print(f"No se pudo guardar la configuración: {e}")
-    return config
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                return defaults
+
+            # Migrate legacy boolean flag
+            if "dark_mode" in data and "theme" not in data:
+                data["theme"] = "dark_theme" if data.get("dark_mode") else "light_theme"
+
+            # Migrate legacy display name
+            if "theme_text" in data and "theme" not in data:
+                data["theme"] = normalize_theme(data.get("theme_text"))
+            elif "theme" in data:
+                data["theme"] = normalize_theme(data.get("theme"))
+
+            for k, v in defaults.items():
+                data.setdefault(k, v)
+            return data
+    except Exception as e:
+        print(f"Error loading config from {path}: {e}")
+        return defaults
+
+
+def save_config(updates):
+    """
+    Update configuration keys and persist to disk.
+    Always normalizes the theme name if provided.
+    """
+    current = load_config()
+    current.update(updates)
+    if "theme" in current:
+        current["theme"] = normalize_theme(current["theme"])
+
+    path = get_config_path()
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(current, f, indent=4)
+    except Exception as e:
+        print(f"Error saving config to {path}: {e}")
+    return current
 
 
 def get_theme_stylesheet(theme_name):
     """
-    Return the QSS contents for ``theme_name``.
-    Empty string means "Light Theme" (no stylesheet), None means the QSS
-    file could not be found.
+    Load a QSS stylesheet by canonical theme name.
+    Returns the CSS string or empty string on failure.
     """
-    theme = normalize_theme(theme_name)
-    if theme == "Light Theme":
+    canonical = normalize_theme(theme_name)
+    if canonical == "light_theme":
         return ""
 
-    qss_file = get_resource_path(os.path.join("themes", f"{theme}.qss"))
+    qss_path = get_resource_path(os.path.join("themes", f"{canonical}.qss"))
     try:
-        with open(qss_file, "r", encoding="utf-8") as f:
+        with open(qss_path, "r", encoding="utf-8") as f:
             return f.read()
-    except OSError:
-        print(f"Tema {theme} no encontrado en {qss_file}")
-        return None
+    except OSError as e:
+        print(f"Theme '{theme_name}' not found at {qss_path}: {e}")
+        return ""
 
 
 def make_relative_path(absolute_path):
@@ -276,14 +281,12 @@ def make_relative_path(absolute_path):
     This ensures icon paths stored in the DB are portable when moving the app folder.
     """
     base_path = get_app_dir()
+
     try:
         relative = os.path.relpath(absolute_path, base_path)
-        # If the relative path goes outside the base dir (starts with '..'), keep absolute
         if not relative.startswith('..'):
-            # Normalize to forward slashes for consistency
             return relative.replace('\\', '/')
     except ValueError:
-        # On Windows, relpath raises ValueError for paths on different drives
         pass
 
     return absolute_path
@@ -300,28 +303,32 @@ def open_system_terminal(command):
             return True
 
         if is_macos():
-            subprocess.Popen(['osascript', '-e', f'tell application "Terminal" to do script "{command}"'])
+            escaped = command.replace('"', '\\"')
+            subprocess.Popen([
+                "osascript", "-e",
+                f'tell application "Terminal" to do script "{escaped}" activate'
+            ])
             return True
 
-        terminal_emulators = ['x-terminal-emulator', 'gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm']
-        for term in terminal_emulators:
-            term_path = shutil.which(term)
-            if not term_path:
-                continue
+        # Linux: try common terminal emulators
+        terminals = [
+            ["x-terminal-emulator", "-e", f"bash -c '{command}; exec bash'"],
+            ["gnome-terminal", "--", "bash", "-c", f"{command}; exec bash"],
+            ["konsole", "-e", "bash", "-c", f"{command}; exec bash"],
+            ["xfce4-terminal", "-e", f"bash -c '{command}; exec bash'"],
+            ["alacritty", "-e", "bash", "-c", f"{command}; exec bash"],
+            ["kitty", "bash", "-c", f"{command}; exec bash"],
+            ["xterm", "-e", f"bash -c '{command}; exec bash'"],
+        ]
+        for term_cmd in terminals:
             try:
-                if term == 'gnome-terminal':
-                    subprocess.Popen([term_path, '--', 'bash', '-lc', command])
-                else:
-                    subprocess.Popen([term_path, '-e', 'bash', '-lc', command])
+                subprocess.Popen(term_cmd)
                 return True
-            except OSError as e:
-                print(f"No se pudo abrir {term}: {e}")
+            except FileNotFoundError:
                 continue
-
-        print("No se encontró un emulador de terminal disponible (xterm, gnome-terminal, konsole...).")
         return False
     except Exception as e:
-        print(f"Error opening terminal: {e}")
+        print(f"Failed to launch system terminal: {e}")
         return False
 
 
@@ -337,26 +344,106 @@ def open_browser(url):
         print(f"Error opening browser: {e}")
 
 
-def clean_text_format(editor, on_after_clean=None):
+def clean_text_format(editor_or_cursor, on_after_clean=None):
     """
     Remove rich text formatting (background colors, fonts)
     and leave only plain text.
+    Handles both a QTextEdit/QPlainTextEdit widget or a QTextCursor.
     """
-    cursor = editor.textCursor()
+    if hasattr(editor_or_cursor, "textCursor"):
+        cursor = editor_or_cursor.textCursor()
+        editor = editor_or_cursor
+    else:
+        cursor = editor_or_cursor
+        editor = None
+
     if not cursor.hasSelection():
         cursor.select(QTextCursor.SelectionType.Document)
-
+    
     if cursor.hasSelection():
         text_puro = cursor.selectedText().replace('\u2029', '\n')
-
-        clean_char_fmt = QTextCharFormat()
+        
+        clean_char_fmt = QTextCharFormat() 
         clean_block_fmt = QTextBlockFormat()
 
         cursor.setBlockFormat(clean_block_fmt)
         cursor.setCharFormat(clean_char_fmt)
         cursor.insertText(text_puro, clean_char_fmt)
-
-        editor.setFocus()
-
-        if on_after_clean:
+        
+        if editor and hasattr(editor, "setFocus"):
+            editor.setFocus()
+        
+        if on_after_clean and callable(on_after_clean):
             on_after_clean()
+
+
+def patch_mongita():
+    """
+    Sincroniza y protege Mongita contra condiciones de carrera multi-proceso
+    (p. ej., cuando la IA o scripts externos crean tareas mientras GNU Mau está abierto).
+    """
+    try:
+        import bson
+        from mongita.engines import disk_engine
+        itrn = sys.intern
+
+        orig_put_metadata = disk_engine.DiskEngine.put_metadata
+
+        def patched_get_file_attrs(self, collection):
+            file_attrs_path = self._get_full_path(collection, "$.file_attrs")
+            mtime = os.path.getmtime(file_attrs_path) if os.path.exists(file_attrs_path) else 0
+            cached_mtime = getattr(self, "_file_attrs_mtime", {}).get(collection, -1)
+            if collection not in self._file_attrs or mtime != cached_mtime:
+                try:
+                    with open(file_attrs_path, "rb") as f:
+                        disk_attrs = bson.decode(f.read())
+                except FileNotFoundError:
+                    disk_attrs = {"loc_idx": {}, "spare_bytes": 0, "total_bytes": 0}
+                if collection in self._file_attrs:
+                    mem_loc = self._file_attrs[collection].setdefault("loc_idx", {})
+                    for k, v in disk_attrs.get("loc_idx", {}).items():
+                        if k not in mem_loc:
+                            mem_loc[k] = v
+                    for k in list(mem_loc.keys()):
+                        if k not in disk_attrs.get("loc_idx", {}):
+                            mem_loc.pop(k, None)
+                    self._file_attrs[collection]["spare_bytes"] = disk_attrs.get("spare_bytes", 0)
+                    self._file_attrs[collection]["total_bytes"] = disk_attrs.get("total_bytes", 0)
+                else:
+                    self._file_attrs[itrn(collection)] = disk_attrs
+                if hasattr(self, "_cache") and itrn(collection) in self._cache:
+                    self._cache[itrn(collection)].clear()
+                if not hasattr(self, "_file_attrs_mtime"):
+                    self._file_attrs_mtime = {}
+                self._file_attrs_mtime[collection] = mtime
+            return self._file_attrs[collection]["loc_idx"]
+
+        def patched_put_metadata(self, collection, metadata):
+            file_attrs_path = self._get_full_path(collection, "$.file_attrs")
+            if os.path.exists(file_attrs_path):
+                try:
+                    with open(file_attrs_path, "rb") as f:
+                        disk_attrs = bson.decode(f.read())
+                    mem_loc = self._file_attrs.setdefault(collection, {"total_bytes": 0, "spare_bytes": 0, "loc_idx": {}}).setdefault("loc_idx", {})
+                    for k, v in disk_attrs.get("loc_idx", {}).items():
+                        if k not in mem_loc:
+                            mem_loc[k] = v
+                except Exception:
+                    pass
+            ret = orig_put_metadata(self, collection, metadata)
+            if hasattr(self, "_file_attrs_mtime") and os.path.exists(file_attrs_path):
+                try:
+                    self._file_attrs_mtime[collection] = os.path.getmtime(file_attrs_path)
+                except Exception:
+                    pass
+            return ret
+
+        disk_engine.DiskEngine._get_file_attrs = patched_get_file_attrs
+        disk_engine.DiskEngine.put_metadata = patched_put_metadata
+    except Exception as e:
+        print(f"Aviso: No se pudo aplicar el parche multi-proceso de Mongita: {e}")
+
+
+# Aplicar el parche automáticamente al importar utils
+patch_mongita()
+
