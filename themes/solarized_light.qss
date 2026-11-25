@@ -1,0 +1,212 @@
+/* --- ESTILO GENERAL --- */
+QWidget {
+    background-color: #fdf6e3;
+    color: #657b83;
+    font-size: 10pt;
+}
+
+
+
+QPushButton {
+    background-color: #e6dfc5;
+    color: #657b83;
+    border: 1px solid #2aa198;
+    border-radius: 4px;        /* Reducido un poco para que encaje mejor */
+    padding: 2px;              /* Reducimos el padding al mínimo para que no empuje el borde */
+    min-height: 18px;          /* Bajamos la altura mínima de 22px a 18px */
+    max-height: 22px;          /* Añadimos una altura máxima para que no crezca de más */
+    min-width: 24px;           /* Un poco más de ancho para que el icono respire */
+}
+
+
+QPushButton:hover {
+    background-color: #93a1a1;
+    border: 1px solid #268bd2; /* Brillo al pasar el mouse */
+}
+
+QPushButton:pressed {
+    background-color: #eee8d5;
+    padding-left: 5px; 
+    padding-top: 5px;
+}
+
+/* --- QCOMBOBOX (Flecha Moderna) --- */
+QComboBox {
+    border: 1px solid #93a1a1;
+    border-radius: 5px;
+    padding: 5px 30px 5px 10px;
+    background-color: #eee8d5;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 25px;
+    border-left: 1px solid #93a1a1;
+}
+
+QComboBox::down-arrow {
+    image: none; 
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #268bd2; 
+    margin-top: 2px;
+}
+
+/* --- CAMPOS DE TEXTO (Redondeados) --- */
+QLineEdit {
+    background-color: #eee8d5;
+    color: #657b83;
+    border: 1px solid #93a1a1;
+    border-radius: 5px; /* Consistente con los botones */
+    padding: 5px;
+}
+
+QLineEdit:focus {
+    border: 1px solid #268bd2;
+}
+
+/* --- TABS (Pestañas) --- */
+QTabBar::tab {
+    background-color: #eee8d5;
+    color: #839496;
+    padding: 8px 15px;
+    border: 1px solid #93a1a1;
+    border-bottom: none;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #e6dfc5;
+    color: #268bd2;
+    margin-bottom: -1px; 
+    border-top: 2px solid #268bd2;
+}
+
+/* --- PANEL Y TABLAS --- */
+QTabWidget::pane {
+    border: 1px solid #93a1a1;
+    top: -1px; 
+    background-color: #fdf6e3;
+}
+
+QTableWidget {
+    background-color: #eee8d5;
+    alternate-background-color: #fdf6e3; /* Esto quita el blanco de las filas alternas */
+    gridline-color: #93a1a1;
+    border: 1px solid #93a1a1;
+    border-radius: 5px;
+    color: #657b83; /* Asegura que el texto sea claro */
+}
+
+QTableWidget::item {
+    background-color: #eee8d5;
+    color: #657b83;
+}
+
+QTableWidget::item:selected {
+    background-color: #268bd2;
+    color: #fdf6e3;
+}
+
+QHeaderView::section {
+    background-color: #eee8d5; /* Color oscuro igual a la tabla */
+    color: #268bd2;            /* Color azul claro para el texto */
+    padding: 5px;
+    border: 1px solid #fdf6e3;
+    font-weight: bold;         /* Para que resalte más */
+}
+
+QHeaderView {
+    background-color: #eee8d5;
+    border: none;
+}
+
+
+/* --- SCROLLBAR VERTICAL --- */
+QScrollBar:vertical {
+    border: none;
+    background: #fdf6e3; /* Fondo igual al general */
+    width: 10px;         /* Más delgado y elegante */
+    margin: 0px 0px 0px 0px;
+}
+
+/* La barrita que se mueve */
+QScrollBar::handle:vertical {
+    background: #93a1a1; /* Color gris azulado */
+    min-height: 20px;
+    border-radius: 5px;  /* Bordes redondeados */
+    margin: 2px;         /* Pequeño margen para que parezca flotar */
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #268bd2; /* Color azul brillante al pasar el mouse */
+}
+
+/* Eliminar las flechas de arriba y abajo */
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+/* --- SCROLLBAR HORIZONTAL (Opcional por si aparece) --- */
+QScrollBar:horizontal {
+    border: none;
+    background: #fdf6e3;
+    height: 10px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #93a1a1;
+    min-width: 20px;
+    border-radius: 5px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: #268bd2;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* --- GROUPBOX  --- */
+QGroupBox {
+    border: 1px solid #93a1a1; /* Gris azulado sutil en lugar de blanco */
+    border-radius: 6px;
+    margin-top: 1.2em; /* Espacio para el título */
+    font-weight: bold;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left; /* Título arriba a la izquierda */
+    left: 10px;
+    padding: 0 5px;
+    color: #268bd2; /* El azul claro que combina con tus botones */
+}
+
+
+/* --- CAMPO DE TEXTO MULTILiNEA (QTextEdit) --- */
+QTextEdit {
+    background-color: #eee8d5;
+    color: #657b83;
+    border: 1px solid #93a1a1;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QTextEdit:focus {
+    border: 1px solid #268bd2;
+}

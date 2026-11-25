@@ -10,7 +10,7 @@
 
 ## ✨ Key Features
 
-### � Project Management
+### 📁 Project Management
 
 - **Centralized Info**: Store project-specific credentials, URLs, and documentation.
 - **Embedded Terminal**: Execute project commands directly from the interface using quick-access terminal buttons.
@@ -45,35 +45,36 @@
 
 ---
 
-## 🚀 Setup & Installation
+## 🚀 Setup & Installation (Windows & Linux)
 
-Mau uses **Poetry** for robust dependency management, ensuring a consistent environment.
+Para una explicación exhaustiva con comandos paso a paso para ambas plataformas, consulta la **[Guía de Ejecución y Compilación (GUIA_EJECUCION.md)](GUIA_EJECUCION.md)**.
 
-### Prerequisites
+### 🐧 En Linux (Fedora / Debian / Ubuntu)
+- **Con Podman (Recomendado para desarrollo)**:
+  ```bash
+  ./start.sh
+  ```
+- **Compilar Binario Nativo (standalone ELF)**:
+  ```bash
+  ./build_linux.sh
+  ./dist/gnu-mau
+  ```
+- **Con Poetry (Desarrollo local)**:
+  ```bash
+  poetry install
+  poetry run python main.py
+  ```
 
-- Python 3.11 (PySide6 6.5 supports 3.11 only)
-- [Poetry](https://python-poetry.org/docs/#installation)
-
-### Getting Started
-
-1. **Install Dependencies**:
-
-   ```bash
-   poetry install
-   ```
-
-2. **Activate Environment**:
-
-   ```bash
-   poetry shell
-   ```
-
-3. **Launch Application**:
-   ```bash
-   python main.py
-   ```
-
-_Tip: You can also run it directly using `poetry run python main.py`._
+### 🪟 En Windows
+- **Con Poetry (Desarrollo)**:
+  ```powershell
+  poetry install
+  poetry run python main.py
+  ```
+- **Compilar Binario `.exe`**:
+  ```powershell
+  poetry run pyinstaller setup.spec --clean
+  ```
 
 ### Podman / Docker
 

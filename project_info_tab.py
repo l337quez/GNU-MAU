@@ -81,6 +81,12 @@ class ProjectInfoTab(QWidget):
         self.additional_info_table.setAlternatingRowColors(True)
         self.additional_info_table.verticalHeader().setVisible(False)
         self.additional_info_table.setEditTriggers(QAbstractItemView.AllEditTriggers)
+        self.additional_info_table.setSortingEnabled(True)
+        
+        self.additional_info_table.horizontalHeader().sortIndicatorChanged.connect(self.update_sort_indicator)
+        
+        # Sort indicator shown by default
+        self.update_sort_indicator(0, Qt.AscendingOrder)
 
         self.info_layout.addWidget(self.additional_info_table)
 
@@ -90,6 +96,7 @@ class ProjectInfoTab(QWidget):
 
     def update_project_info(self, name, description, info):
         self.project_name_label.setText(f"Project: {name}")
+        self.additional_info_table.setSortingEnabled(False)
         self.clear_table()
         info_dict = info if isinstance(info, dict) else {}
         for key, info_item in info_dict.items():
@@ -102,6 +109,17 @@ class ProjectInfoTab(QWidget):
                 if not action and info_item.get("terminal"):
                     action = "terminal"
             self.add_info_item(key, value, action, category)
+        
+        self.additional_info_table.setSortingEnabled(True)
+        self.additional_info_table.sortItems(0, Qt.AscendingOrder)
+
+    @Slot(int, Qt.SortOrder)
+    def update_sort_indicator(self, logicalIndex, order):
+        if logicalIndex == 0:
+            arrow = "   ▲" if order == Qt.AscendingOrder else "   ▼"
+            self.additional_info_table.setHorizontalHeaderLabels([f"Key{arrow}", "Value", "Actions"])
+        else:
+            self.additional_info_table.setHorizontalHeaderLabels(["Key", "Value", "Actions"])
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
@@ -325,7 +343,10 @@ class ProjectInfoTab(QWidget):
             
             info_data = {"value": value, "action": action_type, "category": ""}
             self.main_window.current_project_info[name] = info_data
+            
+            self.additional_info_table.setSortingEnabled(False)
             self.add_info_item(name, value, action_type, "")
+            self.additional_info_table.setSortingEnabled(True)
 
             projects_collection = self.main_window.db.projects
             p_id = self.main_window.current_project_id

@@ -33,6 +33,10 @@ THEME_ALIASES = {
     "Arctic Mist": "arctic_mist",
     "amber_dusk": "amber_dusk",
     "Amber Dusk": "amber_dusk",
+    "solarized_light": "solarized_light",
+    "Solarized Light": "solarized_light",
+    "tokyo_night": "tokyo_night",
+    "Tokyo Night": "tokyo_night",
 }
 
 
@@ -48,17 +52,6 @@ def is_linux():
     return sys.platform.startswith('linux')
 
 
-def get_resource_base():
-    """
-    Directory that holds read-only resources (assets, themes).
-    Inside a PyInstaller bundle resources live in sys._MEIPASS; when running
-    from source they are next to this file, never relative to the CWD.
-    """
-    if getattr(sys, 'frozen', False):
-        return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.executable)))
-    return os.path.dirname(os.path.abspath(__file__))
-
-
 def get_app_dir():
     """
     Writable directory of the application (next to the executable when frozen,
@@ -71,36 +64,86 @@ def get_app_dir():
 
 def get_resource_path(relative_path):
     """
-    Get the absolute path of the resources, compatible with PyInstaller and
-    independent from the current working directory.
+    Get the absolute path of resources, compatible with PyInstaller (sys._MEIPASS / _internal)
+    and running from source, independent of CWD.
     """
-    return os.path.join(get_resource_base(), relative_path)
+    if not relative_path:
+        return ""
+
+    # Normalize Windows backslashes
+    norm_path = relative_path.replace("\\", "/")
+
+    # If the path is a full Windows/Linux path containing 'assets/', extract the relative 'assets/...' part
+    if "assets/" in norm_path:
+        relative_path = "assets/" + norm_path.split("assets/", 1)[1]
+
+    if getattr(sys, 'frozen', False):
+        # 1. First check inside PyInstaller temporary directory (sys._MEIPASS)
+        meipass_path = os.path.join(getattr(sys, '_MEIPASS', ''), relative_path)
+        if os.path.exists(meipass_path):
+            return meipass_path
+
+        # 2. Check next to executable or inside _internal/
+        exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        direct_path = os.path.join(exe_dir, relative_path)
+        if os.path.exists(direct_path):
+            return direct_path
+
+        internal_path = os.path.join(exe_dir, "_internal", relative_path)
+        if os.path.exists(internal_path):
+            return internal_path
+
+        if os.path.exists(relative_path):
+            return relative_path
+
+        return meipass_path
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        cand = os.path.join(base_path, relative_path)
+        if os.path.exists(cand):
+            return cand
+        if os.path.exists(relative_path):
+            return relative_path
+        return cand
 
 
-def get_data_dir():
+def get_data_dir(folder_name=None):
     """
     Base directory for user data (storage + mongita_data).
     GNU_MAU_DATA_DIR allows mounting a persistent volume (Podman/Docker).
 
     For PyInstaller onedir builds the historical location is ``_internal``
     (next to the executable), so existing installations keep their data.
+    If folder_name is provided, returns the subfolder path.
     """
     custom = os.environ.get("GNU_MAU_DATA_DIR")
     if custom:
-        return os.path.abspath(os.path.expanduser(custom))
-    if getattr(sys, 'frozen', False):
+        base = os.path.abspath(os.path.expanduser(custom))
+    elif getattr(sys, 'frozen', False):
         exe_dir = os.path.dirname(os.path.abspath(sys.executable))
         internal_dir = os.path.join(exe_dir, "_internal")
-        return internal_dir if os.path.isdir(internal_dir) else exe_dir
-    return get_app_dir()
+        if os.path.isdir(internal_dir):
+            base = internal_dir
+        elif os.access(exe_dir, os.W_OK):
+            base = exe_dir
+        else:
+            base = os.path.join(os.path.expanduser("~"), ".myapp")
+    else:
+        base = get_app_dir()
+
+    if folder_name:
+        target = os.path.join(base, folder_name)
+        os.makedirs(target, exist_ok=True)
+        return target
+    return base
 
 
 def get_storage_dir():
-    return os.path.join(get_data_dir(), "storage")
+    return get_data_dir("storage")
 
 
 def get_mongita_dir():
-    return os.path.join(get_data_dir(), "mongita_data")
+    return get_data_dir("mongita_data")
 
 
 def get_config_dir():
@@ -233,7 +276,6 @@ def make_relative_path(absolute_path):
     This ensures icon paths stored in the DB are portable when moving the app folder.
     """
     base_path = get_app_dir()
-
     try:
         relative = os.path.relpath(absolute_path, base_path)
         # If the relative path goes outside the base dir (starts with '..'), keep absolute

@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: cli-anything-gnu-mau
+Version: 1.0.0
+Summary: CLI-Anything harness for GNU Mau (Multipurpose Automation Utility)
+Author: CLI-Anything
+License: MIT
+Requires-Python: >=3.10
+Requires-Dist: click>=8.0
+Requires-Dist: mongita<2.0.0,>=1.2.0
+Requires-Dist: python-dotenv
+Requires-Dist: prompt_toolkit>=3.0
+Requires-Dist: markdown2>=2.5
+Dynamic: author
+Dynamic: license
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary

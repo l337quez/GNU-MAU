@@ -1,0 +1,2 @@
+[console_scripts]
+cli-anything-gnu-mau = cli_anything.gnu_mau.gnu_mau_cli:cli

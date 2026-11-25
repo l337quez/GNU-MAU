@@ -1112,6 +1112,16 @@ class ProjectDiagramTab(QWidget):
 
     @Slot()
     def create_new_diagram(self):
+        if not self.project_id:
+            if hasattr(self, 'main_window') and self.main_window.project_list_widget.count() > 0:
+                first_item = self.main_window.project_list_widget.item(0)
+                self.main_window.project_list_widget.setCurrentItem(first_item)
+                self.main_window.display_project_info(first_item)
+                self.main_window.tabs.setCurrentWidget(self)
+            else:
+                QMessageBox.warning(self, "Advertencia", "Debe tener un proyecto seleccionado para guardar el diagrama.")
+                return
+
         dialog = NewDiagramDialog(self)
         if dialog.exec():
             name, diagram_type = dialog.get_data()

@@ -22,8 +22,10 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Override these paths in a .env file to reuse existing data, e.g.:
-      # GNU_MAU_CONFIG_PATH=/mnt/ronal_disk/contenedores/gnu_mau_data/config
+      # GNU_MAU_CONFIG_PATH=/mnt/ronal_disk/contenedores/gnu_mau_config
       # GNU_MAU_DATA_PATH=/mnt/ronal_disk/contenedores/gnu_mau_data
-      - ${GNU_MAU_CONFIG_PATH:-./.docker-data/config}:/config:z
-      - ${GNU_MAU_DATA_PATH:-./.docker-data/data}:/data:z
+      - ${GNU_MAU_CONFIG_PATH:-/mnt/ronal_disk/contenedores/gnu_mau_config}:/config:z
+      - ${GNU_MAU_DATA_PATH:-/mnt/ronal_disk/contenedores/gnu_mau_data}:/data:z
+      - ${GNU_MAU_DATA_PATH:-/mnt/ronal_disk/contenedores/gnu_mau_data}/mongita_data:/app/mongita_data:z
+      - ${GNU_MAU_DATA_PATH:-/mnt/ronal_disk/contenedores/gnu_mau_data}/storage:/app/storage:z
     network_mode: host

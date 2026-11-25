@@ -27,7 +27,9 @@ else
     exit 1
 fi
 
-# Default (persistent) data directories, created with the user's permissions.
+# Ensure default persistent directories exist
+mkdir -p "${GNU_MAU_CONFIG_PATH:-/mnt/ronal_disk/contenedores/gnu_mau_config}" \
+         "${GNU_MAU_DATA_PATH:-/mnt/ronal_disk/contenedores/gnu_mau_data}" 2>/dev/null || \
 mkdir -p .docker-data/config .docker-data/data
 
 # Build when needed and start in the background.

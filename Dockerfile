@@ -41,10 +41,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig \
     fonts-noto-color-emoji \
     xauth \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry (the lock file is copied and used as-is, so builds are
-# reproducible and do not resolve dependencies at build time).
+# Install Poetry (pinned for reproducible build)
 RUN pip install --no-cache-dir "poetry==2.5.2"
 
 WORKDIR /app
@@ -56,8 +56,8 @@ RUN poetry config virtualenvs.create false \
 # Copy the application code
 COPY . /app
 
-# Persistent directories (mount points)
-RUN mkdir -p /config /data/storage /data/mongita_data
+# Persistent directories (mount points) and fallback directories
+RUN mkdir -p /config /data/storage /data/mongita_data /app/mongita_data /app/storage
 
 VOLUME ["/config", "/data"]
 
