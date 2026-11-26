@@ -2,7 +2,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
                                QFileDialog, QTextEdit, QGroupBox, QCheckBox, QComboBox,
                                QApplication)
-from PySide6.QtCore import Slot, QTimer, Qt, QProcess
+from PySide6.QtCore import Slot, QTimer, Qt, QProcess, QSize
 from pacmanprogress import Pacman
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QThread, Signal
@@ -11,7 +11,7 @@ from reusable_progress import CustomProgressBar
 import os, json, sys, shutil, subprocess
 import urllib.request
 import zipfile, tarfile, tempfile
-from utils import (get_app_dir, get_config_path, get_mongita_dir,
+from utils import (get_app_dir, get_config_path, get_fa_icon, get_mongita_dir,
                    get_resource_path, get_storage_dir, load_config as load_app_config,
                    normalize_theme, save_config as save_app_config)
 from i18n import tr, set_language, get_language, get_supported_languages
@@ -195,14 +195,9 @@ class SettingTab(QWidget):
         selectors_layout.addStretch()
         self.info_layout.addLayout(selectors_layout)
 
-        # Map display names to internal names
-        self.theme_map = {
-            "Arctic Mist": "arctic_mist",
-            "Amber Dusk": "amber_dusk",
-            "Dark Theme": "dark_theme",
-            "Light Theme": "Light Theme"
-        }
-        self.reverse_theme_map = {v: k for k, v in self.theme_map.items()}
+        # Mapas dinámicos display_name <-> internal_name (se llenan al leer themes/)
+        self.theme_map = {"Light Theme": "Light Theme"}
+        self.reverse_theme_map = {"Light Theme": "Light Theme"}
 
         self.sidebar_group = QGroupBox(tr("sidebar_position"))
         sidebar_layout = QHBoxLayout()
@@ -277,6 +272,8 @@ class SettingTab(QWidget):
         # AI Integration checkbox
         self.ai_checkbox = QCheckBox("Allow AI to create and manage tasks (AI Integration)")
         self.ai_checkbox.setToolTip("Enables AI assistants to create and manage tasks and notes in GNU Mau.")
+        self.ai_checkbox.setIcon(get_fa_icon('wand-magic-sparkles', color='#9cdcfe', size=18))
+        self.ai_checkbox.setIconSize(QSize(18, 18))
         self.ai_checkbox.toggled.connect(self.toggle_ai_integration)
         self.info_layout.addWidget(self.ai_checkbox)
 
@@ -309,7 +306,11 @@ class SettingTab(QWidget):
         self.load_available_languages()
         
         # Set selection in combo box without triggering change_theme twice
-        display_name = self.reverse_theme_map.get(self.current_theme, self.current_theme)
+        display_name = self.reverse_theme_map.get(self.current_theme)
+        if not display_name:
+            display_name = self.current_theme.replace('_', ' ').title()
+            self.theme_map[display_name] = self.current_theme
+            self.reverse_theme_map[self.current_theme] = display_name
         index = self.theme_combo.findText(display_name)
         if index >= 0:
             self.theme_combo.blockSignals(True)
@@ -336,19 +337,27 @@ class SettingTab(QWidget):
         return get_resource_path(os.path.join("themes", f"{normalize_theme(theme_name)}.qss"))
 
     def load_available_themes(self):
+        """Carga los temas y construye el mapeo dinámico display <-> interno."""
         self.theme_combo.blockSignals(True)
         self.theme_combo.clear()
+        self.theme_map = {"Light Theme": "Light Theme"}
+        self.reverse_theme_map = {"Light Theme": "Light Theme"}
         self.theme_combo.addItem("Light Theme")
 
         themes_dir = get_resource_path("themes")
         if os.path.exists(themes_dir):
-            for file in os.listdir(themes_dir):
-                if file.endswith(".qss"):
-                    internal_name = file.replace(".qss", "")
-                    display_name = self.reverse_theme_map.get(internal_name, internal_name)
-                    # Check if already added (to avoid duplicates with the base ones if any)
-                    if self.theme_combo.findText(display_name) == -1:
-                        self.theme_combo.addItem(display_name)
+            for file in sorted(os.listdir(themes_dir)):
+                if not file.endswith(".qss"):
+                    continue
+                internal_name = normalize_theme(file[:-4])
+                if internal_name == "Light Theme":
+                    # light_theme.qss ya está representado por "Light Theme"
+                    continue
+                display_name = internal_name.replace("_", " ").title()
+                self.theme_map[display_name] = internal_name
+                self.reverse_theme_map[internal_name] = display_name
+                if self.theme_combo.findText(display_name) == -1:
+                    self.theme_combo.addItem(display_name)
         self.theme_combo.blockSignals(False)
 
     def load_available_languages(self):
@@ -386,6 +395,8 @@ class SettingTab(QWidget):
         self.tray_checkbox.setText(tr("minimize_to_tray"))
         self.ai_checkbox.setText(tr("allow_ai"))
         self.ai_checkbox.setToolTip(tr("allow_ai_tooltip"))
+        self.ai_checkbox.setIcon(get_fa_icon('wand-magic-sparkles', color='#9cdcfe', size=18))
+        self.ai_checkbox.setIconSize(QSize(18, 18))
         self.check_update_btn.setText(tr("check_updates"))
 
     def apply_theme(self, theme_name):
@@ -406,7 +417,11 @@ class SettingTab(QWidget):
     @Slot(int)
     def change_theme(self, index):
         display_name = self.theme_combo.itemText(index)
-        internal_name = normalize_theme(self.theme_map.get(display_name, display_name))
+        internal_name = self.theme_map.get(display_name)
+        if not internal_name:
+            internal_name = normalize_theme(display_name)
+            self.theme_map[display_name] = internal_name
+            self.reverse_theme_map[internal_name] = display_name
         self.apply_theme(internal_name)
         self.save_config({"theme": internal_name})
         self.current_theme = internal_name

@@ -23,7 +23,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QTabWidget, QBoxLayout
                                QWidget, QVBoxLayout, QHBoxLayout, QSystemTrayIcon,
                                QMenu, QListWidget, QScrollArea, QLabel,
                                QDockWidget, QListWidgetItem, QPushButton, QFrame)
-from PySide6.QtGui import QIcon, QAction, QPixmap, QMovie, QFontDatabase, QPainter
+from PySide6.QtGui import (QIcon, QAction, QPixmap, QMovie, QFontDatabase,
+                           QPainter, QColor, QPen)
 from PySide6.QtCore import Slot, Qt, QEvent, QTimer, QSize
 from PySide6.QtWidgets import QSizePolicy, QStackedWidget
 import sys, os
@@ -145,14 +146,18 @@ class Snackbar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setObjectName("mauSnackbar")
         self.setStyleSheet("""
-            QFrame {
+            #mauSnackbar {
                 background-color: rgba(30, 41, 59, 0.94);
                 color: #ffffff;
                 border: 1px solid rgba(255, 255, 255, 0.18);
                 border-radius: 18px;
             }
-            QLabel {
+            #mauSnackbar QLabel {
                 background: transparent;
                 color: #ffffff;
                 font-size: 13px;
@@ -171,6 +176,15 @@ class Snackbar(QFrame):
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide)
+
+    def paintEvent(self, event):
+        """Dibuja la píldora redondeada; evita el fondo rectangular del QFrame."""
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QColor(30, 41, 59, 240))
+        painter.setPen(QPen(QColor(255, 255, 255, 46), 1))
+        painter.drawRoundedRect(self.rect().adjusted(0, 0, -1, -1), 18, 18)
 
     def show_message(self, message: str, duration_ms: int = 2500):
         self.label.setText(message)
@@ -383,17 +397,22 @@ class MainWindow(QMainWindow):
         self.footer_layout.setContentsMargins(0, 4, 0, 0)
         self.footer_layout.setSpacing(6)
         
-        self.settings_btn = QPushButton("⚙️")
-        self.settings_btn.setFixedSize(48, 40)
+        self.settings_btn = QPushButton()
+        self.settings_btn.setFixedSize(48, 48)
         self.settings_btn.setCursor(Qt.PointingHandCursor)
         self.settings_btn.setToolTip(tr("settings_tooltip"))
+        self.settings_btn.setIcon(get_fa_icon("gear", color="#ffffff", size=22))
+        self.settings_btn.setIconSize(QSize(22, 22))
         self.settings_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 border: 1px solid rgba(128, 128, 128, 0.35);
                 border-radius: 8px;
-                font-size: 22px;
                 padding: 0px;
+                min-width: 46px;  /* + 1px border = 48px final */
+                max-width: 46px;
+                min-height: 46px;
+                max-height: 46px;
             }
             QPushButton:hover {
                 background-color: rgba(128, 128, 128, 0.25);
@@ -402,17 +421,22 @@ class MainWindow(QMainWindow):
         """)
         self.settings_btn.clicked.connect(self.show_settings_view)
 
-        self.about_btn = QPushButton("ℹ️")
-        self.about_btn.setFixedSize(48, 40)
+        self.about_btn = QPushButton()
+        self.about_btn.setFixedSize(48, 48)
         self.about_btn.setCursor(Qt.PointingHandCursor)
         self.about_btn.setToolTip(tr("about_tooltip"))
+        self.about_btn.setIcon(get_fa_icon("circle-info", color="#ffffff", size=22))
+        self.about_btn.setIconSize(QSize(22, 22))
         self.about_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
                 border: 1px solid rgba(128, 128, 128, 0.35);
                 border-radius: 8px;
-                font-size: 22px;
                 padding: 0px;
+                min-width: 46px;  /* + 1px border = 48px final */
+                max-width: 46px;
+                min-height: 46px;
+                max-height: 46px;
             }
             QPushButton:hover {
                 background-color: rgba(128, 128, 128, 0.25);
@@ -452,11 +476,13 @@ class MainWindow(QMainWindow):
         dock_position = Qt.DockWidgetArea(dock_position_int)
         self.addDockWidget(dock_position, self.dock_widget)
 
-        self.dock_widget.dockLocationChanged.connect(self.save_sidebar_position)
+        self.dock_widget.dockLocationChanged.connect(self.on_dock_location_changed)
 
         # Aplicar estado inicial de colapso si estaba guardado
         if self.is_sidebar_collapsed:
             self._apply_collapsed_ui(True)
+        # Adaptar el sidebar según el área del dock guardada (Left/Right/Top/Bottom)
+        self._apply_sidebar_orientation()
 
         # Snackbar flotante centralizado para mensajes de acción
         self.snackbar = Snackbar(self)
@@ -482,9 +508,20 @@ class MainWindow(QMainWindow):
         self.is_sidebar_collapsed = not self.is_sidebar_collapsed
         self.config = save_config({"sidebar_collapsed": self.is_sidebar_collapsed})
         self._apply_collapsed_ui(self.is_sidebar_collapsed)
+        self._apply_sidebar_orientation()
 
     def _apply_collapsed_ui(self, collapsed):
         """Actualiza la apariencia y el ancho del sidebar según el estado."""
+        # Disposición vertical (Left/Right) antes de aplicar el modo compacto.
+        self.sidebar_layout.setDirection(QBoxLayout.TopToBottom)
+        self.sidebar_layout.setSpacing(6)
+        self.project_list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.project_list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.dock_widget.setMinimumHeight(0)
+        self.dock_widget.setMaximumHeight(524287)
+
         if collapsed:
             current_w = self.dock_widget.width()
             if current_w > 70:
@@ -496,7 +533,6 @@ class MainWindow(QMainWindow):
 
             # Rail compacto: los 3 botones comparten tamaño, radio y estados.
             button_size = SQUARE_SIZE
-            accent_color = "#9cdcfe"
 
             self.create_project_button.setText("")
             self.create_project_button.setIcon(get_fa_icon("plus", color="#ffffff", size=20))
@@ -538,13 +574,13 @@ class MainWindow(QMainWindow):
             """
 
             self.settings_btn.setText("")
-            self.settings_btn.setIcon(get_fa_icon("gear", color=accent_color, size=20))
+            self.settings_btn.setIcon(get_fa_icon("gear", color="#ffffff", size=20))
             self.settings_btn.setIconSize(QSize(20, 20))
             self.settings_btn.setFixedSize(button_size, button_size)
             self.settings_btn.setStyleSheet(compact_icon_style)
 
             self.about_btn.setText("")
-            self.about_btn.setIcon(get_fa_icon("circle-info", color=accent_color, size=20))
+            self.about_btn.setIcon(get_fa_icon("circle-info", color="#ffffff", size=20))
             self.about_btn.setIconSize(QSize(20, 20))
             self.about_btn.setFixedSize(button_size, button_size)
             self.about_btn.setStyleSheet(compact_icon_style)
@@ -640,6 +676,7 @@ class MainWindow(QMainWindow):
             self.create_project_button.setMinimumWidth(0)
             self.create_project_button.setMaximumWidth(16777215)
             self.create_project_button.setFixedHeight(35)
+            self.sidebar_layout.setAlignment(self.create_project_button, Qt.Alignment())
             self.create_project_button.setStyleSheet("""
                 QPushButton {
                     color: white;
@@ -650,17 +687,21 @@ class MainWindow(QMainWindow):
                 }
             """)
 
-            # Footer horizontal con el estilo expandido original
-            self.settings_btn.setIcon(QIcon())
-            self.settings_btn.setText("⚙️")
-            self.settings_btn.setFixedSize(48, 40)
+            # Footer horizontal con iconos vectoriales blancos
+            self.settings_btn.setText("")
+            self.settings_btn.setIcon(get_fa_icon("gear", color="#ffffff", size=22))
+            self.settings_btn.setIconSize(QSize(22, 22))
+            self.settings_btn.setFixedSize(48, 48)
             self.settings_btn.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
                     border: 1px solid rgba(128, 128, 128, 0.35);
                     border-radius: 8px;
-                    font-size: 22px;
                     padding: 0px;
+                    min-width: 46px;  /* + 1px border = 48px final */
+                    max-width: 46px;
+                    min-height: 46px;
+                    max-height: 46px;
                 }
                 QPushButton:hover {
                     background-color: rgba(128, 128, 128, 0.25);
@@ -668,16 +709,20 @@ class MainWindow(QMainWindow):
                 }
             """)
 
-            self.about_btn.setIcon(QIcon())
-            self.about_btn.setText("ℹ️")
-            self.about_btn.setFixedSize(48, 40)
+            self.about_btn.setText("")
+            self.about_btn.setIcon(get_fa_icon("circle-info", color="#ffffff", size=22))
+            self.about_btn.setIconSize(QSize(22, 22))
+            self.about_btn.setFixedSize(48, 48)
             self.about_btn.setStyleSheet("""
                 QPushButton {
                     background-color: transparent;
                     border: 1px solid rgba(128, 128, 128, 0.35);
                     border-radius: 8px;
-                    font-size: 22px;
                     padding: 0px;
+                    min-width: 46px;  /* + 1px border = 48px final */
+                    max-width: 46px;
+                    min-height: 46px;
+                    max-height: 46px;
                 }
                 QPushButton:hover {
                     background-color: rgba(128, 128, 128, 0.25);
@@ -730,6 +775,179 @@ class MainWindow(QMainWindow):
         area: A Qt.DockWidgetArea value (Left, Right, Top, Bottom)
         """
         self.addDockWidget(area, self.dock_widget)
+        self._apply_sidebar_orientation(area)
+
+    def on_dock_location_changed(self, area):
+        """Persiste la posición y reconfigura el sidebar (vertical u horizontal)."""
+        self.save_sidebar_position()
+        self._apply_sidebar_orientation(area)
+
+    def _is_horizontal_dock(self, area=None):
+        area = self.dockWidgetArea(self.dock_widget) if area is None else area
+        return area in (Qt.TopDockWidgetArea, Qt.BottomDockWidgetArea)
+
+    def _apply_sidebar_orientation(self, area=None):
+        """
+        Adapta el sidebar al área del dock:
+        - Left/Right: disposición vertical existente (rail o expandido).
+        - Top/Bottom: flujo horizontal compacto para no dejar una columna de 52px.
+        """
+        horizontal = self._is_horizontal_dock(area)
+        self.sidebar_is_horizontal = horizontal
+
+        if not horizontal:
+            # Restaura el layout vertical normal (colapsado o expandido)
+            self._apply_collapsed_ui(self.is_sidebar_collapsed)
+            return
+
+        collapsed = self.is_sidebar_collapsed
+        icon_size = 20 if collapsed else 22
+
+        # Flujo horizontal del sidebar
+        self.sidebar_layout.setDirection(QBoxLayout.LeftToRight)
+        self.sidebar_layout.setContentsMargins(6, 4, 6, 4)
+        self.sidebar_layout.setSpacing(8)
+        self.sidebar_title_label.setVisible(not collapsed)
+
+        # Botón crear compacto, igual que en el rail
+        self.create_project_button.setText("")
+        self.create_project_button.setIcon(get_fa_icon("plus", color="#ffffff", size=20))
+        self.create_project_button.setIconSize(QSize(20, 20))
+        self.create_project_button.setFixedSize(SQUARE_SIZE, SQUARE_SIZE)
+        self.create_project_button.setStyleSheet("""
+            QPushButton {
+                background-color: #34495e;
+                border: none;
+                border-radius: 6px;
+                padding: 0px;
+                margin: 0px;
+                min-width: 48px;
+                max-width: 48px;
+                min-height: 48px;
+                max-height: 48px;
+            }
+            QPushButton:hover {
+                background-color: #2c3e50;
+            }
+        """)
+        self.sidebar_layout.setAlignment(self.create_project_button, Qt.AlignVCenter)
+
+        compact_icon_style = """
+            QPushButton {
+                background-color: rgba(128, 128, 128, 0.12);
+                border: none;
+                border-radius: 6px;
+                padding: 0px;
+                margin: 0px;
+                min-width: 48px;
+                max-width: 48px;
+                min-height: 48px;
+                max-height: 48px;
+            }
+            QPushButton:hover {
+                background-color: rgba(128, 128, 128, 0.25);
+            }
+        """
+
+        self.settings_btn.setText("")
+        self.settings_btn.setIcon(get_fa_icon("gear", color="#ffffff", size=icon_size))
+        self.settings_btn.setIconSize(QSize(icon_size, icon_size))
+        self.settings_btn.setFixedSize(SQUARE_SIZE, SQUARE_SIZE)
+        self.settings_btn.setStyleSheet(compact_icon_style)
+
+        self.about_btn.setText("")
+        self.about_btn.setIcon(get_fa_icon("circle-info", color="#ffffff", size=icon_size))
+        self.about_btn.setIconSize(QSize(icon_size, icon_size))
+        self.about_btn.setFixedSize(SQUARE_SIZE, SQUARE_SIZE)
+        self.about_btn.setStyleSheet(compact_icon_style)
+
+        # Footer horizontal
+        for i in reversed(range(self.footer_layout.count())):
+            self.footer_layout.takeAt(i)
+        self.footer_layout.setDirection(QBoxLayout.LeftToRight)
+        self.footer_layout.setContentsMargins(0, 0, 0, 0)
+        self.footer_layout.setSpacing(6)
+        self.footer_layout.setAlignment(Qt.AlignVCenter)
+        self.footer_layout.addWidget(self.settings_btn)
+        self.footer_layout.addWidget(self.about_btn)
+
+        # Lista de proyectos en flujo horizontal
+        self._configure_horizontal_project_list()
+
+        # Altura compacta y ancho libre (sin el límite de 52px del rail)
+        self.dock_widget.setMinimumWidth(0)
+        self.dock_widget.setMaximumWidth(524287)
+        self.dock_widget.setMinimumHeight(64)
+        self.dock_widget.setMaximumHeight(88)
+        self.resizeDocks([self.dock_widget], [72], Qt.Vertical)
+
+    def _configure_horizontal_project_list(self):
+        """Configura la lista de proyectos en una fila horizontal compacta."""
+        list_widget = self.project_list_widget
+
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            full_text = item.data(Qt.UserRole + 2)
+            if not full_text:
+                full_text = item.text()
+                item.setData(Qt.UserRole + 2, full_text)
+            item.setText("")
+            item.setToolTip(full_text)
+
+        list_widget.setViewMode(QListWidget.IconMode)
+        list_widget.setFlow(QListWidget.LeftToRight)
+        list_widget.setWrapping(False)
+        list_widget.setMovement(QListWidget.Static)
+        list_widget.setResizeMode(QListWidget.Adjust)
+        list_widget.setIconSize(QSize(ICON_SIZE, ICON_SIZE))
+        list_widget.setGridSize(QSize(SQUARE_SIZE, SQUARE_SIZE))
+        list_widget.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        list_widget.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        list_widget.setStyleSheet("""
+            QListWidget {
+                background: transparent;
+                border: none;
+            }
+            QListWidget::item {
+                width: 48px;
+                height: 48px;
+                margin: 0px 2px;
+                padding: 0px;
+                border: none;
+                border-bottom: none;
+                border-radius: 6px;
+                color: transparent;
+            }
+            QListWidget::item:selected {
+                background: rgba(128, 128, 128, 0.35);
+                border-radius: 6px;
+                border: none;
+                border-bottom: none;
+                color: transparent;
+            }
+            QListWidget::item:hover {
+                background: rgba(128, 128, 128, 0.2);
+                border-radius: 6px;
+                border: none;
+                border-bottom: none;
+                color: transparent;
+            }
+            QListWidget QScrollBar:horizontal {
+                height: 4px;
+                background: transparent;
+            }
+            QListWidget QScrollBar::handle:horizontal {
+                background: rgba(128, 128, 128, 0.5);
+                border-radius: 2px;
+                min-width: 20px;
+            }
+            QListWidget QScrollBar::add-line:horizontal,
+            QListWidget QScrollBar::sub-line:horizontal {
+                width: 0px;
+            }
+        """)
 
     def apply_theme(self, theme_name):
         """
