@@ -21,8 +21,8 @@ class AboutTab(QWidget):
         self.logo_label.setFixedSize(120, 120)
         self.logo_label.setAlignment(Qt.AlignCenter)
         
-        base_path = os.path.dirname(__file__) 
-        image_path = os.path.join(base_path, "assets", "banner", "mau-banner.png")
+        image_path = get_resource_path(os.path.join("assets", "banner", "mau-banner.png"))
+
         
         pixmap = QPixmap(image_path)
         if not pixmap.isNull():
@@ -33,14 +33,14 @@ class AboutTab(QWidget):
         
         header_layout.addWidget(self.logo_label, alignment=Qt.AlignCenter)
 
-        app_name = QLabel("Modular Application Utility")
+        app_name = QLabel("Multipurpose Automation Utility")
         app_name.setStyleSheet("font-size: 12px; font-weight: bold;")
         header_layout.addWidget(app_name, alignment=Qt.AlignCenter)
 
         main_layout.addWidget(header_frame)
 
         self.version_label = QLabel(
-            "<b>GNU Mau</b>, the <i>Modular Application Utility</i>, is a cross-platform program (GNU Linux, Windows) <br>"
+            "<b>GNU Mau</b>, is a client of <b>Mau</b>, is a cross-platform program (GNU Linux, Windows) <br>"
             "that helps us organize tasks, notes and credentials in projects. It is designed for backend and <br>"
             "DevOps developers, but it is an open-source utility that can be used by anyone."
         )

@@ -1,16 +1,20 @@
-from mongita import MongitaClientDisk
 from app.core.config import get_settings
 
 settings = get_settings()
 
-# Cliente Mongita reutilizable (singleton a nivel de módulo)
-_client: MongitaClientDisk | None = None
+# Cliente genérico (puede ser MongitaClientDisk o pymongo.MongoClient)
+_client = None
 
 
-def get_client() -> MongitaClientDisk:
+def get_client():
     global _client
     if _client is None:
-        _client = MongitaClientDisk(settings.MONGITA_DB_DIR)
+        if settings.DB_ENGINE == "mongodb":
+            from pymongo import MongoClient
+            _client = MongoClient(settings.MONGODB_URI)
+        else:
+            from mongita import MongitaClientDisk
+            _client = MongitaClientDisk(settings.MONGITA_DB_DIR)
     return _client
 
 
@@ -21,4 +25,4 @@ def get_db():
     try:
         yield db
     finally:
-        pass  # Mongita no requiere cierre explícito por request
+        pass  # Ni PyMongo ni Mongita requieren cierre explícito por request

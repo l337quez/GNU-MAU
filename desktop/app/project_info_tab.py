@@ -4,7 +4,9 @@ from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
 from bson.objectid import ObjectId
-from utils import get_resource_path, make_relative_path, open_system_terminal, open_browser, is_windows
+from utils import (get_resource_path, make_relative_path, open_system_terminal, 
+                   open_browser, is_windows, encrypt_value, decrypt_value, send_api_request)
+import urllib.parse
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
@@ -66,12 +68,16 @@ class ProjectInfoTab(QWidget):
         self.action_selector.addItems(["\U0001f6ab None", "\U0001f4bb Terminal", "\U0001f310 Browser"])
         self.action_selector.setFixedWidth(110)
 
+        self.encrypt_checkbox = QCheckBox("🔒 Encriptar")
+        self.encrypt_checkbox.setFixedWidth(90)
+
         self.add_info_button = QPushButton("Add")
         self.add_info_button.clicked.connect(self.add_project_info)
         
         self.info_form_layout.addWidget(self.info_name_input)
         self.info_form_layout.addWidget(self.info_value_input)
         self.info_form_layout.addWidget(self.action_selector)
+        self.info_form_layout.addWidget(self.encrypt_checkbox)
         self.info_form_layout.addWidget(self.add_info_button)
         self.info_layout.addLayout(self.info_form_layout)
 
@@ -93,7 +99,14 @@ class ProjectInfoTab(QWidget):
         self.clear_table()
         info_dict = info if isinstance(info, dict) else {}
         for key, info_item in info_dict.items():
-            value = info_item["value"] if isinstance(info_item, dict) else info_item
+            is_encrypted = False
+            if isinstance(info_item, dict):
+                is_encrypted = info_item.get("encrypted", False)
+                raw_value = info_item["value"]
+                value = decrypt_value(raw_value) if is_encrypted else raw_value
+            else:
+                value = info_item
+                
             category = ""
             action = "none"
             if isinstance(info_item, dict):
@@ -101,23 +114,26 @@ class ProjectInfoTab(QWidget):
                 action = info_item.get("action")
                 if not action and info_item.get("terminal"):
                     action = "terminal"
-            self.add_info_item(key, value, action, category)
+            self.add_info_item(key, value, action, category, is_encrypted)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value, action=None, category=""):
+    def add_info_item(self, key, value, action=None, category="", encrypted=False):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         
         key_item = QTableWidgetItem(key)
         key_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
         key_item.setData(Qt.UserRole, key)            # key original (para edición)
-        key_item.setData(Qt.UserRole + 1, category)  # categoría asignada
+        key_item.setData(Qt.UserRole + 1, category)   # categoría asignada
+        key_item.setData(Qt.UserRole + 2, encrypted)  # encriptado asignado
         self.additional_info_table.setItem(row_position, 0, key_item)
         
-        value_item = QTableWidgetItem(value)
+        display_value = "••••••••" if encrypted else value
+        value_item = QTableWidgetItem(display_value)
         value_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled | Qt.ItemIsEditable)
+        value_item.setData(Qt.UserRole, value)        # guardar valor desencriptado original
         self.additional_info_table.setItem(row_position, 1, value_item)
         
         actions_widget = QWidget()
@@ -209,44 +225,75 @@ class ProjectInfoTab(QWidget):
         if key_item and value_item:
             old_key = key_item.data(Qt.UserRole)  # Get the original key before editing
             new_key = key_item.text()
-            value = value_item.text()
+            was_encrypted = key_item.data(Qt.UserRole + 2) or False
+            
+            # Si el valor sigue enmascarado y no se cambió, usar el original desencriptado
+            new_value = value_item.text()
+            if was_encrypted and new_value == "••••••••":
+                value = value_item.data(Qt.UserRole)
+            else:
+                value = new_value
 
             # Ensure that current_project_info exists
             if not hasattr(self.main_window, 'current_project_info'):
                 self.main_window.current_project_info = {}
 
-            if old_key != new_key:  # If the key has changed
-                # Update the project dictionary
-                if old_key in self.main_window.current_project_info:
-                    info_item = self.main_window.current_project_info.pop(old_key)
-                    if isinstance(info_item, dict):
-                        info_item["value"] = value
-                        self.main_window.current_project_info[new_key] = info_item
-                    else:
-                        self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
-                else:
-                    self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
-            else:
-                # Si el key no ha cambiado, solo actualiza el valor
-                info_item = self.main_window.current_project_info.get(new_key)
-                if isinstance(info_item, dict):
-                    info_item["value"] = value
-                else:
-                    self.main_window.current_project_info[new_key] = {"value": value, "action": "none"}
+            val_to_save = encrypt_value(value) if was_encrypted else value
 
-            projects_collection = self.main_window.db.projects
+            orig_action = None
+            orig_cat = ""
+            if old_key in self.main_window.current_project_info:
+                old_info = self.main_window.current_project_info[old_key]
+                if isinstance(old_info, dict):
+                    orig_action = old_info.get("action")
+                    orig_cat = old_info.get("category", "")
+
+            info_item = {
+                "value": val_to_save,
+                "action": orig_action,
+                "category": orig_cat,
+                "encrypted": was_encrypted
+            }
+
+            new_info_dict = dict(self.main_window.current_project_info)
+            if old_key != new_key:
+                new_info_dict.pop(old_key, None)
+            new_info_dict[new_key] = info_item
+
             p_id = self.main_window.current_project_id
-            if isinstance(p_id, str): p_id = ObjectId(p_id)
+            payload = {
+                "info": new_info_dict
+            }
+            url = f"http://localhost:9000/api/projects/{p_id}"
+            response = send_api_request(url, method="PUT", data=payload)
+            if response is None:
+                print("No se pudo guardar la fila en el backend, guardando localmente...")
+                try:
+                    oid = ObjectId(p_id) if isinstance(p_id, str) else p_id
+                    self.main_window.db.projects.update_one(
+                        {"_id": oid},
+                        {"$set": {"info": new_info_dict}}
+                    )
+                    response = {"info": new_info_dict}
+                except Exception as e:
+                    print(f"Error al guardar localmente: {e}")
 
-            projects_collection.update_one(
-                {"_id": p_id},
-                {"$set": {
-                    "info": self.main_window.current_project_info
-                }}
-            )
-
-            key_item.setData(Qt.UserRole, new_key)
-            self.main_window.statusBar().showMessage(f"Key '{new_key}' saved successfully!", 2000)
+            if response:
+                self.main_window.current_project_info = response.get("info", {})
+                
+                key_item.setData(Qt.UserRole, new_key)
+                value_item.setData(Qt.UserRole, value)
+                
+                # Actualizar las categorías del filtro
+                categories = sorted({
+                    v.get("category", "") for v in self.main_window.current_project_info.values()
+                    if isinstance(v, dict) and v.get("category", "")
+                })
+                self.update_categories_filter(categories)
+                
+                self.main_window.statusBar().showMessage(f"Key '{new_key}' saved successfully!", 2000)
+            else:
+                self.main_window.statusBar().showMessage("Error saving row via API", 2000)
 
     @Slot()
     def enable_editing(self):
@@ -256,6 +303,7 @@ class ProjectInfoTab(QWidget):
         self.info_name_input.setVisible(enabled)
         self.info_value_input.setVisible(enabled)
         self.action_selector.setVisible(enabled)
+        self.encrypt_checkbox.setVisible(enabled)
         self.add_info_button.setVisible(enabled)
 
     @Slot()
@@ -303,44 +351,92 @@ class ProjectInfoTab(QWidget):
         if icon_path:
             stored_path = make_relative_path(icon_path)
             self.main_window.current_project_item.setIcon(QIcon(icon_path))
-            projects_collection = self.main_window.db.projects
             
             p_id = self.main_window.current_project_id
-            if isinstance(p_id, str): p_id = ObjectId(p_id)
+            encoded_path = urllib.parse.quote(stored_path)
+            url = f"http://localhost:9000/api/projects/{p_id}/icon?icon_path={encoded_path}"
+            
+            response = send_api_request(url, method="PATCH")
+            if response is None:
+                print("No se pudo actualizar el icono en el backend, actualizando localmente...")
+                try:
+                    oid = ObjectId(p_id) if isinstance(p_id, str) else p_id
+                    self.main_window.db.projects.update_one(
+                        {"_id": oid},
+                        {"$set": {"icon_path": stored_path}}
+                    )
+                    self.main_window.update_project_icon(self.main_window.current_project_name, stored_path)
+                    response = {"icon_path": stored_path}
+                except Exception as e:
+                    print(f"Error al actualizar icono localmente: {e}")
 
-            result = projects_collection.update_one(
-                {"_id": p_id},
-                {"$set": {"icon_path": stored_path}}
-            )
-            print(f"Icon path updated: {result.modified_count} document(s) modified.")     
+            if response:
+                print("Icon path updated successfully.")
+            else:
+                print("Error updating icon.")
 
     @Slot()
     def add_project_info(self):
-        name = self.info_name_input.text()
-        value = self.info_value_input.text()
+        name = self.info_name_input.text().strip()
+        value = self.info_value_input.text().strip()
 
         if name and value:
             idx = self.action_selector.currentIndex()
             action_type = [None, "terminal", "browser"][idx]
+            is_encrypted = self.encrypt_checkbox.isChecked()
             
-            info_data = {"value": value, "action": action_type, "category": ""}
-            self.main_window.current_project_info[name] = info_data
-            self.add_info_item(name, value, action_type, "")
-
-            projects_collection = self.main_window.db.projects
+            val_to_save = encrypt_value(value) if is_encrypted else value
             p_id = self.main_window.current_project_id
-            if isinstance(p_id, str): p_id = ObjectId(p_id)
+            
+            params = {
+                "key": name,
+                "value": val_to_save,
+                "encrypted": str(is_encrypted).lower(),
+                "category": ""
+            }
+            if action_type:
+                params["action"] = action_type
+            
+            query_string = urllib.parse.urlencode(params)
+            url = f"http://localhost:9000/api/projects/{p_id}/info?{query_string}"
+            
+            response = send_api_request(url, method="PATCH")
+            if response is None:
+                print("No se pudo añadir la info en el backend, añadiendo localmente...")
+                try:
+                    oid = ObjectId(p_id) if isinstance(p_id, str) else p_id
+                    new_info_dict = dict(self.main_window.current_project_info)
+                    new_info_dict[name] = {
+                        "value": val_to_save,
+                        "action": action_type,
+                        "category": "",
+                        "encrypted": is_encrypted
+                    }
+                    self.main_window.db.projects.update_one(
+                        {"_id": oid},
+                        {"$set": {"info": new_info_dict}}
+                    )
+                    response = {"info": new_info_dict}
+                except Exception as e:
+                    print(f"Error al añadir info localmente: {e}")
 
-            projects_collection.update_one(
-                {"_id": p_id},
-                {"$set": {
-                    "info": self.main_window.current_project_info
-                }}
-            )
-
-            self.info_name_input.clear()
-            self.info_value_input.clear()
-            self.action_selector.setCurrentIndex(0)
+            if response:
+                self.main_window.current_project_info = response.get("info", {})
+                self.add_info_item(name, value, action_type, "", is_encrypted)
+                
+                categories = sorted({
+                    v.get("category", "") for v in self.main_window.current_project_info.values()
+                    if isinstance(v, dict) and v.get("category", "")
+                })
+                self.update_categories_filter(categories)
+                
+                self.info_name_input.clear()
+                self.info_value_input.clear()
+                self.action_selector.setCurrentIndex(0)
+                self.encrypt_checkbox.setChecked(False)
+                self.main_window.statusBar().showMessage(f"Key '{name}' added successfully!", 2000)
+            else:
+                self.main_window.statusBar().showMessage("Error adding info via API", 2000)
 
     @Slot(str, str)
     def copy_to_clipboard(self, key, value):
@@ -354,18 +450,36 @@ class ProjectInfoTab(QWidget):
         key_item = self.additional_info_table.item(row_position, 0)
         if key_item:
             key = key_item.text()
-            if key in self.main_window.current_project_info:
-                del self.main_window.current_project_info[key]
-            
-            projects_collection = self.main_window.db.projects
             p_id = self.main_window.current_project_id
-            if isinstance(p_id, str): p_id = ObjectId(p_id)
+            
+            encoded_key = urllib.parse.quote(key)
+            url = f"http://localhost:9000/api/projects/{p_id}/info/{encoded_key}"
+            
+            response = send_api_request(url, method="DELETE")
+            if response is None:
+                print("No se pudo eliminar la info del backend, eliminando localmente...")
+                try:
+                    oid = ObjectId(p_id) if isinstance(p_id, str) else p_id
+                    new_info_dict = dict(self.main_window.current_project_info)
+                    new_info_dict.pop(key, None)
+                    self.main_window.db.projects.update_one(
+                        {"_id": oid},
+                        {"$set": {"info": new_info_dict}}
+                    )
+                    response = {"info": new_info_dict}
+                except Exception as e:
+                    print(f"Error al eliminar info localmente: {e}")
 
-            projects_collection.update_one(
-                {"_id": p_id},
-                {"$set": {
-                    "info": self.main_window.current_project_info
-                }}
-            )
-            self.additional_info_table.removeRow(row_position)
-            self.main_window.statusBar().showMessage(f"Key '{key}' deleted.", 2000)
+            if response:
+                self.main_window.current_project_info = response.get("info", {})
+                self.additional_info_table.removeRow(row_position)
+                
+                categories = sorted({
+                    v.get("category", "") for v in self.main_window.current_project_info.values()
+                    if isinstance(v, dict) and v.get("category", "")
+                })
+                self.update_categories_filter(categories)
+                
+                self.main_window.statusBar().showMessage(f"Key '{key}' deleted successfully!", 2000)
+            else:
+                self.main_window.statusBar().showMessage(f"Error deleting key '{key}' via API.", 2000)

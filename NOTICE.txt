@@ -1,0 +1,10 @@
+Mau Task & Credential Manager
+Copyright 2025-2026 Ronal Forero and contributors
+
+This product includes software developed by Ronal Forero
+(https://github.com/tu-usuario/gnu-mau).
+
+=========================================================================
+Third-Party Notices:
+=========================================================================
+

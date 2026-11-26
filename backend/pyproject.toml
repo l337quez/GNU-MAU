@@ -1,0 +1,33 @@
+[project]
+name = "gnu-mau-backend"
+version = "0.1.0"
+description = "FastAPI backend for GNU-MAU"
+authors = [
+    {name = "l337quez", email = "l337quez.dev@gmail.com"}
+]
+license = {text = "GPL V3"}
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.10.0",
+    "mongita==1.2.0",
+    "pymongo>=4.0.0",
+    "python-dotenv>=1.0.1",
+    "fido2>=1.1.0",
+    "webauthn>=2.2.0",
+    "pyjwt>=2.8.0",
+    "python-arango>=7.8.0",
+    "passlib[bcrypt] (>=1.7.4,<2.0.0)",
+    "python-multipart (>=0.0.32,<0.0.33)",
+    "email-validator (>=2.3.0,<3.0.0)",
+    "markitdown (>=0.1.6,<0.2.0)",
+]
+
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

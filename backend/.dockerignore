@@ -1,0 +1,28 @@
+# Excluir entorno virtual
+venv/
+.venv/
+env/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Archivos de configuración local y base de datos local
+.env
+.env.example
+*.db
+mongita_data/
+
+# IDEs y Git
+.git
+.github
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

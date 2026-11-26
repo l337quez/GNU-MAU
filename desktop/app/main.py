@@ -19,7 +19,7 @@ from project_todo_tab import ProjectTodoTab
 from project_note_tab import ProjectNoteTab
 from project_diagram_tab import ProjectDiagramTab
 from tools import CurlWrapperTab
-from utils import get_resource_path, clean_text_format, is_windows
+from utils import get_resource_path, clean_text_format, is_windows, send_api_request
 
 
 load_dotenv()
@@ -236,9 +236,10 @@ class MainWindow(QMainWindow):
             if getattr(sys, 'frozen', False):
                 base_path = sys._MEIPASS
             else:
-                base_path = os.path.dirname(os.path.abspath(__file__))
+                base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             
             qss_file = os.path.join(base_path, "themes", f"{theme_name}.qss")
+
             try:
                 with open(qss_file, "r") as f:
                     self.setStyleSheet(f.read())
@@ -267,16 +268,21 @@ class MainWindow(QMainWindow):
 
     def load_projects(self):
         self.gif_labels = []
-        projects_collection = self.db.projects
-        projects = projects_collection.find()
+        
+        # Intentar traer los proyectos desde el backend
+        projects = send_api_request("http://localhost:9000/api/projects/")
+        if projects is None:
+            print("No se pudo conectar al backend, cargando desde base de datos local (Mongita)...")
+            projects = list(self.db.projects.find())
         
         self.project_list_widget.clear()
         
         for project in projects:
-            description = project['description'] if len(project['description']) <= 8 else project['description'][:8] + "..."
-            item = QListWidgetItem(f"{project['name']}: {description}")
+            description = project.get('description', '')
+            description = description if len(description) <= 8 else description[:8] + "..."
+            item = QListWidgetItem(f"{project.get('name', '')}: {description}")
             
-            project_id = str(project["_id"]) 
+            project_id = str(project.get("_id") or project.get("id"))
             item.setData(Qt.UserRole, project_id) 
 
             icon_path = project.get('icon_path', "assets/project_images/default_icon.png")
@@ -321,13 +327,16 @@ class MainWindow(QMainWindow):
             self.show_create_project_form()
             return 
 
-        # Convert to ObjectId for querying
-        try:
-            p_id = ObjectId(project_id) if isinstance(project_id, str) else project_id
-            project = self.db.projects.find_one({"_id": p_id})
-        except Exception as e:
-            print(f"Error querying project: {e}")
-            project = None
+        # Intentar obtener el proyecto desde el backend
+        project = send_api_request(f"http://localhost:9000/api/projects/{project_id}")
+        if not project:
+            print("No se pudo obtener el proyecto desde el backend, intentando local...")
+            try:
+                p_id = ObjectId(project_id) if isinstance(project_id, str) else project_id
+                project = self.db.projects.find_one({"_id": p_id})
+            except Exception as e:
+                print(f"Error querying project locally: {e}")
+                project = None
 
         if not project:
             return

@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  database:
+    image: mongo:6.0
+    container_name: mau_db
+    restart: always
+    ports:
+      - "27027:27017" # Expuesto para conectar herramientas como MongoDB Compass desde local
+    volumes:
+      - mongodb_data:/data/db
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mau_backend
+    restart: always
+    ports:
+      - "9000:9000"
+    environment:
+      - DEBUG=true
+      - DB_ENGINE=mongodb
+      - MONGODB_URI=mongodb://database:27017
+      - DB_NAME=projects_db
+      - ARANGO_URL=http://arangodb:8529
+      - ARANGO_ROOT_PASSWORD=gnumau_secret
+      - ARANGO_DB_NAME=gnu_mau_knowledge
+    depends_on:
+      - database
+      - arangodb
+
+  arangodb:
+    image: arangodb:3.11
+    container_name: mau_arangodb
+    restart: always
+    environment:
+      - ARANGO_ROOT_PASSWORD=gnumau_secret
+    ports:
+      - "8529:8529"
+    volumes:
+      - arangodb_data:/var/lib/arangodb3
+
+volumes:
+  mongodb_data:
+  arangodb_data:

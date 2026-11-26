@@ -9,6 +9,7 @@ class InfoItem(BaseModel):
     value: str
     action: Optional[str] = None   # None | "terminal" | "browser"
     category: Optional[str] = ""
+    encrypted: Optional[bool] = False
 
 
 # ──────────────────────────────────────────────

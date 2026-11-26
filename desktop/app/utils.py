@@ -1,4 +1,7 @@
 import sys, os, subprocess, webbrowser
+import json
+import urllib.request
+import urllib.parse
 from PySide6.QtGui import QTextCursor, QTextCharFormat, QTextBlockFormat 
 
 def is_windows():
@@ -17,7 +20,7 @@ def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
     else:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
 def make_relative_path(absolute_path):
@@ -29,7 +32,7 @@ def make_relative_path(absolute_path):
     if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
     else:
-        base_path = os.path.abspath(".")
+        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     try:
         relative = os.path.relpath(absolute_path, base_path)
@@ -98,3 +101,39 @@ def clean_text_format(editor, on_after_clean=None):
         
         if on_after_clean:
             on_after_clean()
+
+
+import base64
+
+SECRET_KEY = "GNU_MAU_SECRET_KEY_2026"
+
+def encrypt_value(plain_text: str) -> str:
+    if not plain_text:
+        return ""
+    # XOR encryption
+    xor_bytes = bytes([ord(c) ^ ord(SECRET_KEY[i % len(SECRET_KEY)]) for i, c in enumerate(plain_text)])
+    return base64.b64encode(xor_bytes).decode('utf-8')
+
+def decrypt_value(cipher_text: str) -> str:
+    if not cipher_text:
+        return ""
+    try:
+        xor_bytes = base64.b64decode(cipher_text.encode('utf-8'))
+        plain_bytes = bytes([b ^ ord(SECRET_KEY[i % len(SECRET_KEY)]) for i, b in enumerate(xor_bytes)])
+        return plain_bytes.decode('utf-8')
+    except Exception:
+        # Fallback to original text if decryption fails
+        return cipher_text
+
+def send_api_request(url, method="GET", data=None):
+    req = urllib.request.Request(url, method=method)
+    req.add_header("Content-Type", "application/json")
+    body = None
+    if data is not None:
+        body = json.dumps(data).encode("utf-8")
+    try:
+        with urllib.request.urlopen(req, data=body, timeout=5) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception as e:
+        print(f"API Error ({method} {url}): {e}")
+        return None

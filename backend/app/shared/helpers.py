@@ -10,9 +10,14 @@ def serialize_project(doc: dict) -> dict:
     info = {}
     for key, val in info_raw.items():
         if isinstance(val, dict):
-            info[key] = val
+            info[key] = {
+                "value": val.get("value", ""),
+                "action": val.get("action"),
+                "category": val.get("category", ""),
+                "encrypted": val.get("encrypted", False)
+            }
         else:
-            info[key] = {"value": str(val), "action": None, "category": ""}
+            info[key] = {"value": str(val), "action": None, "category": "", "encrypted": False}
 
     return {
         "id": str(doc["_id"]),

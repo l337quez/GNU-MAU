@@ -290,7 +290,7 @@ class SettingTab(QWidget):
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
         else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         return os.path.join(base_path, "themes", f"{theme_name}.qss")
 
     def load_available_themes(self):
@@ -301,7 +301,7 @@ class SettingTab(QWidget):
         if getattr(sys, 'frozen', False):
             base_path = sys._MEIPASS
         else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
+            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         themes_dir = os.path.join(base_path, "themes")
         if os.path.exists(themes_dir):

@@ -11,7 +11,7 @@ from bson.objectid import ObjectId
 # MAU imports
 from todo_text_editor import TodoTextEditor
 from emoji_picker import EmojiPicker
-from utils import clean_text_format
+from utils import clean_text_format, send_api_request
 
 class ProjectTodoTab(QWidget):
     def __init__(self, main_window, project_id):
@@ -151,7 +151,18 @@ class ProjectTodoTab(QWidget):
 
     def confirm_deletion(self):
         if self.current_todo_id:
-            self.todos_collection.delete_one({"_id": ObjectId(self.current_todo_id)})
+            is_backend = False
+            if self.current_todo_item:
+                is_backend = self.current_todo_item.data(Qt.UserRole + 1) or False
+
+            if is_backend:
+                url = f"http://localhost:9000/api/todos/{self.current_todo_id}"
+                send_api_request(url, method="DELETE")
+
+            try:
+                self.todos_collection.delete_one({"_id": ObjectId(self.current_todo_id)})
+            except Exception:
+                pass
             
             # Clean vars
             self.current_todo_id = None
@@ -172,10 +183,21 @@ class ProjectTodoTab(QWidget):
         self.text_editor.blockSignals(True)
         self.todo_list_widget.clear()
         
-        todos = self.todos_collection.find({"project_id": str(self.project_id)})
+        url = f"http://localhost:9000/api/projects/{self.project_id}/todos"
+        todos = send_api_request(url)
+        
+        is_backend = True
+        if todos is None:
+            is_backend = False
+            print("No se pudo conectar al backend de TODOs, cargando locales...")
+            todos = list(self.todos_collection.find({"project_id": str(self.project_id)}))
+        
         for todo in todos:
-            item = QListWidgetItem(todo["title"])
-            item.setData(Qt.UserRole, str(todo["_id"]))
+            title = todo.get("title", "")
+            todo_id = str(todo.get("id") or todo.get("_id"))
+            item = QListWidgetItem(title)
+            item.setData(Qt.UserRole, todo_id)
+            item.setData(Qt.UserRole + 1, is_backend)
             self.todo_list_widget.addItem(item)
         
         self.title_input.blockSignals(False)
@@ -189,16 +211,30 @@ class ProjectTodoTab(QWidget):
 
     def create_new_todo(self):
         self.save_current_todo()
-        new_todo = {
+        
+        url = f"http://localhost:9000/api/projects/{self.project_id}/todos"
+        payload = {
             "title": "New TODO",
-            "content": "☐ My first task",
-            "project_id": str(self.project_id)
+            "content": "☐ My first task"
         }
-        res = self.todos_collection.insert_one(new_todo)
+        response = send_api_request(url, method="POST", data=payload)
+        
+        target_id = None
+        if response and "id" in response:
+            target_id = response["id"]
+        else:
+            new_todo = {
+                "title": "New TODO",
+                "content": "☐ My first task",
+                "project_id": str(self.project_id)
+            }
+            res = self.todos_collection.insert_one(new_todo)
+            target_id = str(res.inserted_id)
+            
         self.load_todos()
         
         for i in range(self.todo_list_widget.count()):
-            if self.todo_list_widget.item(i).data(Qt.UserRole) == str(res.inserted_id):
+            if self.todo_list_widget.item(i).data(Qt.UserRole) == target_id:
                 self.todo_list_widget.setCurrentRow(i)
                 self.select_todo_item(self.todo_list_widget.item(i))
                 break
@@ -210,7 +246,18 @@ class ProjectTodoTab(QWidget):
         self.save_current_todo()
         self.current_todo_id = item.data(Qt.UserRole)
         self.current_todo_item = item
-        data = self.todos_collection.find_one({"_id": ObjectId(self.current_todo_id)})
+        
+        is_backend = item.data(Qt.UserRole + 1) or False
+        data = None
+        if is_backend:
+            url = f"http://localhost:9000/api/todos/{self.current_todo_id}"
+            data = send_api_request(url)
+            
+        if not data:
+            try:
+                data = self.todos_collection.find_one({"_id": ObjectId(self.current_todo_id)})
+            except Exception:
+                data = None
         
         if data:
             self.title_input.blockSignals(True)
@@ -239,14 +286,33 @@ class ProjectTodoTab(QWidget):
             title = self.title_input.text()
             content = self.text_editor.toMarkdown()
 
-            self.todos_collection.update_one(
-                {"_id": ObjectId(self.current_todo_id)},
-                {"$set": {
-                    "title": title, 
-                    "content": content,
-                    "project_id": str(self.project_id)
-                }}
-            )
+            is_backend = False
+            if self.current_todo_item:
+                is_backend = self.current_todo_item.data(Qt.UserRole + 1) or False
+
+            saved_to_backend = False
+            if is_backend:
+                url = f"http://localhost:9000/api/todos/{self.current_todo_id}"
+                payload = {
+                    "title": title,
+                    "content": content
+                }
+                response = send_api_request(url, method="PUT", data=payload)
+                if response:
+                    saved_to_backend = True
+
+            if not saved_to_backend:
+                try:
+                    self.todos_collection.update_one(
+                        {"_id": ObjectId(self.current_todo_id)},
+                        {"$set": {
+                            "title": title, 
+                            "content": content,
+                            "project_id": str(self.project_id)
+                        }}
+                    )
+                except Exception:
+                    pass
             
             # Siempre usar el item rastreado explícitamente, nunca currentItem()
             item_to_update = self.current_todo_item

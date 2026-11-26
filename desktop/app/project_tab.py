@@ -7,7 +7,10 @@ from PySide6.QtCore import Slot, Qt, QStringListModel
 import json
 from PySide6.QtGui import QIcon, QClipboard
 from bson.objectid import ObjectId
-from utils import get_resource_path, make_relative_path, open_system_terminal, open_browser
+from utils import (get_resource_path, make_relative_path, open_system_terminal, 
+                   open_browser, encrypt_value, decrypt_value, send_api_request)
+import urllib.parse
+
 
 class ProjectTab(QWidget):
     def __init__(self, main_window):
@@ -27,9 +30,9 @@ class ProjectTab(QWidget):
         layout.addWidget(description_label)
         layout.addWidget(self.description_input)
 
-        # ── Toolbar: Icon | Key | Value | Action | Category ─────────────────
-        self.toolbar_layout = QHBoxLayout()
-        self.toolbar_layout.setSpacing(8)
+        # ── Toolbar: Row 1 & Row 2 layouts ───────────────────────────────────
+        self.row1_layout = QHBoxLayout()
+        self.row1_layout.setSpacing(8)
 
         self.change_icon_button = QPushButton("🖼️ Gif")
         self.change_icon_button.setFixedWidth(65)
@@ -46,6 +49,17 @@ class ProjectTab(QWidget):
         self.info_value_input = QLineEdit()
         self.info_value_input.setPlaceholderText("Value...")
 
+        self.encrypt_checkbox = QCheckBox("🔒 Encriptar")
+        self.encrypt_checkbox.setFixedWidth(90)
+
+        self.row1_layout.addWidget(self.change_icon_button)
+        self.row1_layout.addWidget(self.info_name_input)
+        self.row1_layout.addWidget(self.info_value_input)
+        self.row1_layout.addWidget(self.encrypt_checkbox)
+
+        self.row2_layout = QHBoxLayout()
+        self.row2_layout.setSpacing(8)
+
         self.action_selector = QComboBox()
         self.action_selector.addItems(["🚫 None", "💻 Terminal", "🌐 Browser"])
         self.action_selector.setFixedWidth(120)
@@ -61,13 +75,16 @@ class ProjectTab(QWidget):
         self._cat_completer.setFilterMode(Qt.MatchContains)
         self.category_selector.setCompleter(self._cat_completer)
 
-        self.toolbar_layout.addWidget(self.change_icon_button)
-        self.toolbar_layout.addWidget(self.info_name_input)
-        self.toolbar_layout.addWidget(self.info_value_input)
-        self.toolbar_layout.addWidget(self.action_selector)
-        self.toolbar_layout.addWidget(self.category_selector)
+        self.row2_layout.addWidget(self.action_selector)
+        self.row2_layout.addWidget(self.category_selector)
+        self.row2_layout.addStretch()
 
-        layout.addLayout(self.toolbar_layout)
+        self.toolbar_container = QVBoxLayout()
+        self.toolbar_container.setSpacing(6)
+        self.toolbar_container.addLayout(self.row1_layout)
+        self.toolbar_container.addLayout(self.row2_layout)
+
+        layout.addLayout(self.toolbar_container)
 
         # ── Table ────────────────────────────────────────────────────────────
         self.additional_info_table = QTableWidget(0, 3)
@@ -149,15 +166,24 @@ class ProjectTab(QWidget):
         idx = self.action_selector.currentIndex()
         action_type = [None, "terminal", "browser"][idx]
         category = self.category_selector.currentText().strip()
+        is_encrypted = self.encrypt_checkbox.isChecked()
 
-        info_data = {"value": value, "action": action_type, "category": category}
+        val_to_save = encrypt_value(value) if is_encrypted else value
+
+        info_data = {
+            "value": val_to_save,
+            "action": action_type,
+            "category": category,
+            "encrypted": is_encrypted
+        }
         self.main_window.current_project_info[name] = info_data
-        self.add_info_item(name, value, action_type)
+        self.add_info_item(name, value, action_type, is_encrypted)
 
         self.info_name_input.clear()
         self.info_value_input.clear()
         self.action_selector.setCurrentIndex(0)
         self.category_selector.setCurrentIndex(0)
+        self.encrypt_checkbox.setChecked(False)
 
         self._refresh_category_selector()
         self._sync_info_tab_filter()
@@ -169,8 +195,6 @@ class ProjectTab(QWidget):
         if not project_name:
             return
 
-        projects_collection = self.main_window.db.projects
-
         if self.main_window.current_project_item is None:
             default_path = "assets/project_images/default_icon.png"
             project_doc = {
@@ -179,36 +203,59 @@ class ProjectTab(QWidget):
                 "info": self.main_window.current_project_info,
                 "icon_path": default_path
             }
-            result = projects_collection.insert_one(project_doc)
-            self.main_window.current_project_id = str(result.inserted_id)
+            
+            response = send_api_request("http://localhost:9000/api/projects/", method="POST", data=project_doc)
+            if response is None:
+                print("No se pudo crear el proyecto en el backend, creando localmente...")
+                try:
+                    res = self.main_window.db.projects.insert_one(project_doc)
+                    response = {"id": str(res.inserted_id)}
+                except Exception as e:
+                    print(f"Error al crear proyecto localmente: {e}")
 
-            new_item = QListWidgetItem(f"{project_name}: {project_description[:8]}...")
-            new_item.setIcon(QIcon(default_path))
-            new_item.setData(Qt.UserRole, self.main_window.current_project_id)
-            new_item.setData(Qt.UserRole + 1, default_path)
-            self.main_window.project_list_widget.addItem(new_item)
-            self.main_window.current_project_item = new_item
+            if response and "id" in response:
+                self.main_window.current_project_id = response["id"]
 
-            self.change_icon_button.setEnabled(True)
+                new_item = QListWidgetItem(f"{project_name}: {project_description[:8]}...")
+                new_item.setIcon(QIcon(default_path))
+                new_item.setData(Qt.UserRole, self.main_window.current_project_id)
+                new_item.setData(Qt.UserRole + 1, default_path)
+                self.main_window.project_list_widget.addItem(new_item)
+                self.main_window.current_project_item = new_item
+
+                self.change_icon_button.setEnabled(True)
+                self.main_window.statusBar().showMessage(f"Project '{project_name}' saved successfully!", 3000)
+            else:
+                self.main_window.statusBar().showMessage("Error: Could not save project.", 3000)
 
         else:
             p_id = self.main_window.current_project_id
-            if isinstance(p_id, str): p_id = ObjectId(p_id)
+            update_doc = {
+                "name": project_name,
+                "description": project_description,
+                "info": self.main_window.current_project_info
+            }
+            
+            response = send_api_request(f"http://localhost:9000/api/projects/{p_id}", method="PUT", data=update_doc)
+            if response is None:
+                print("No se pudo actualizar el proyecto en el backend, actualizando localmente...")
+                try:
+                    oid = ObjectId(p_id) if isinstance(p_id, str) else p_id
+                    self.main_window.db.projects.update_one(
+                        {"_id": oid},
+                        {"$set": update_doc}
+                    )
+                    response = update_doc
+                except Exception as e:
+                    print(f"Error al actualizar proyecto localmente: {e}")
 
-            projects_collection.update_one(
-                {"_id": p_id},
-                {"$set": {
-                    "name": project_name,
-                    "description": project_description,
-                    "info": self.main_window.current_project_info
-                }}
-            )
-
-            self.main_window.current_project_name = project_name
-            self.main_window.current_project_description = project_description
-            self.main_window.current_project_item.setText(f"{project_name}: {project_description[:8]}...")
-
-        self.main_window.statusBar().showMessage(f"Project '{project_name}' saved!", 3000)
+            if response:
+                self.main_window.current_project_name = project_name
+                self.main_window.current_project_description = project_description
+                self.main_window.current_project_item.setText(f"{project_name}: {project_description[:8]}...")
+                self.main_window.statusBar().showMessage(f"Project '{project_name}' updated successfully!", 3000)
+            else:
+                self.main_window.statusBar().showMessage("Error: Could not update project.", 3000)
 
         if hasattr(self.main_window, 'project_info_tab'):
             self.main_window.project_info_tab.update_project_info(
@@ -217,25 +264,30 @@ class ProjectTab(QWidget):
 
     @Slot()
     def change_icon(self):
-        initial_dir = os.path.join(os.getcwd(), "assets/project_images")
+        initial_dir = get_resource_path("assets/project_images")
         icon_path, _ = QFileDialog.getOpenFileName(self, "Select Icon", initial_dir, "Images (*.gif *.png *.ico *.webp)")
 
         if icon_path:
             if hasattr(self.main_window, 'current_project_id') and self.main_window.current_project_id:
                 try:
                     p_id = self.main_window.current_project_id
-                    if isinstance(p_id, str):
-                        p_id = ObjectId(p_id)
                     stored_path = make_relative_path(icon_path)
-                    result = self.main_window.db.projects.update_one(
-                        {"_id": p_id},
-                        {"$set": {"icon_path": stored_path}}
-                    )
-                    if result.modified_count == 0:
-                        self.main_window.db.projects.update_one(
-                            {"name": self.name_input.text()},
-                            {"$set": {"icon_path": stored_path}}
-                        )
+                    encoded_path = urllib.parse.quote(stored_path)
+                    url = f"http://localhost:9000/api/projects/{p_id}/icon?icon_path={encoded_path}"
+                    response = send_api_request(url, method="PATCH")
+                    if response is None:
+                        print("No se pudo guardar icono en el backend, actualizando localmente...")
+                        try:
+                            oid = ObjectId(p_id) if isinstance(p_id, str) else p_id
+                            self.main_window.db.projects.update_one(
+                                {"_id": oid},
+                                {"$set": {"icon_path": stored_path}}
+                            )
+                            response = {"icon_path": stored_path}
+                        except Exception as e:
+                            print(f"Error al guardar icono localmente: {e}")
+                    if not response:
+                        print("ERROR al guardar icono")
                 except Exception as e:
                     print(f"ERROR al guardar icono: {e}")
 
@@ -263,7 +315,13 @@ class ProjectTab(QWidget):
         self.clear_table()
         info_dict = getattr(self.main_window, 'current_project_info', {})
         for key, info_item in info_dict.items():
-            value = info_item["value"] if isinstance(info_item, dict) else info_item
+            is_encrypted = False
+            if isinstance(info_item, dict):
+                is_encrypted = info_item.get("encrypted", False)
+                raw_value = info_item["value"]
+                value = decrypt_value(raw_value) if is_encrypted else raw_value
+            else:
+                value = info_item
 
             action = "none"
             if isinstance(info_item, dict):
@@ -271,16 +329,18 @@ class ProjectTab(QWidget):
                 if not action and info_item.get("terminal"):
                     action = "terminal"
 
-            self.add_info_item(key, value, action)
+            self.add_info_item(key, value, action, is_encrypted)
 
     def clear_table(self):
         self.additional_info_table.setRowCount(0)
 
-    def add_info_item(self, key, value, action=None):
+    def add_info_item(self, key, value, action=None, encrypted=False):
         row_position = self.additional_info_table.rowCount()
         self.additional_info_table.insertRow(row_position)
         self.additional_info_table.setItem(row_position, 0, QTableWidgetItem(key))
-        self.additional_info_table.setItem(row_position, 1, QTableWidgetItem(value))
+        
+        display_value = "••••••••" if encrypted else value
+        self.additional_info_table.setItem(row_position, 1, QTableWidgetItem(display_value))
 
         actions_widget = QWidget()
         actions_layout = QHBoxLayout()

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
 from PySide6.QtCore import Qt, Slot, QByteArray, QObject, QEvent
 import os
 import json
+from utils import get_resource_path, send_api_request
 
 from qtpynodeeditor import (FlowScene, FlowView, DataModelRegistry, 
                             NodeDataModel, PortType, NodeDataType,
@@ -790,7 +791,7 @@ class ArchitectureNodeWidget(QWidget):
         }
         cls._icon_names = ["Bucket", "API Gateway", "Gateway", "PC", "Computer"]
         
-        icons_dir = os.path.join("resources", "icons")
+        icons_dir = get_resource_path(os.path.join("resources", "icons"))
         if os.path.exists(icons_dir):
             for file in os.listdir(icons_dir):
                 if file.endswith(".png"):
@@ -840,7 +841,7 @@ class ArchitectureNodeWidget(QWidget):
                 icon_file = file
                 break
         
-        icon_path = os.path.join("resources", "icons", icon_file)
+        icon_path = get_resource_path(os.path.join("resources", "icons", icon_file))
         if os.path.exists(icon_path):
             pixmap = QPixmap(icon_path)
             # Use a slightly smaller target for the scaling to fit nicely in the fixed size
@@ -1088,6 +1089,7 @@ class ProjectDiagramTab(QWidget):
         self.diagrams_list.clear()
         self.clear_scene()
         self.current_diagram_file = None
+        self.current_diagram_id = None
         
         if project_id:
             self.setEnabled(True)
@@ -1101,14 +1103,37 @@ class ProjectDiagramTab(QWidget):
 
     def load_diagrams_from_dir(self):
         self.diagrams_list.clear()
-        if os.path.exists(self.diagrams_dir):
-            files = [f for f in os.listdir(self.diagrams_dir) if f.endswith('.json')]
-            for f in files:
-                item = QListWidgetItem(f"📐 {f}")
-                item.setData(Qt.UserRole, os.path.join(self.diagrams_dir, f))
+        
+        # 1. Intentar cargar desde el backend
+        url = f"http://localhost:9000/api/projects/{self.project_id}/diagrams"
+        diagrams = send_api_request(url)
+        
+        if diagrams is not None:
+            for d in diagrams:
+                name = d["name"]
+                if not name.lower().endswith(".json"):
+                    display_name = name + ".json"
+                else:
+                    display_name = name
+                
+                item = QListWidgetItem(f"📐 {display_name}")
+                item.setData(Qt.UserRole, d["id"])
+                item.setData(Qt.UserRole + 1, True) # True indica backend
                 item.setFlags(item.flags() | Qt.ItemIsEditable)
                 item.setSizeHint(QSize(0, 30))
                 self.diagrams_list.addItem(item)
+        else:
+            # 2. Fallback local
+            print("No se pudo conectar al backend de diagramas, cargando locales...")
+            if os.path.exists(self.diagrams_dir):
+                files = [f for f in os.listdir(self.diagrams_dir) if f.endswith('.json')]
+                for f in files:
+                    item = QListWidgetItem(f"📐 {f}")
+                    item.setData(Qt.UserRole, os.path.join(self.diagrams_dir, f))
+                    item.setData(Qt.UserRole + 1, False) # False indica local
+                    item.setFlags(item.flags() | Qt.ItemIsEditable)
+                    item.setSizeHint(QSize(0, 30))
+                    self.diagrams_list.addItem(item)
 
     @Slot()
     def create_new_diagram(self):
@@ -1116,33 +1141,68 @@ class ProjectDiagramTab(QWidget):
         if dialog.exec():
             name, diagram_type = dialog.get_data()
             if name:
-                if not name.lower().endswith(".json"): name += ".json"
-                path = os.path.join(self.diagrams_dir, name)
-                try:
-                    # Create empty scene json
-                    empty_scene = {"type": diagram_type, "nodes": [], "connections": []}
-                            
-                    with open(path, 'w', encoding='utf-8') as f:
-                        f.write(json.dumps(empty_scene, indent=4))
-                    
+                # Intentar crear en el backend
+                url = f"http://localhost:9000/api/projects/{self.project_id}/diagrams"
+                payload = {
+                    "name": name,
+                    "type": diagram_type,
+                    "nodes": [],
+                    "connections": []
+                }
+                response = send_api_request(url, method="POST", data=payload)
+                
+                if response and "id" in response:
                     self.load_diagrams_from_dir()
                     for i in range(self.diagrams_list.count()):
                         item = self.diagrams_list.item(i)
-                        if item.data(Qt.UserRole) == path:
+                        if item.data(Qt.UserRole) == response["id"]:
                             self.diagrams_list.setCurrentItem(item)
                             self.open_selected_diagram(item)
                             break
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", str(e))
+                else:
+                    # Fallback local
+                    if not name.lower().endswith(".json"): name += ".json"
+                    path = os.path.join(self.diagrams_dir, name)
+                    try:
+                        empty_scene = {"type": diagram_type, "nodes": [], "connections": []}
+                        with open(path, 'w', encoding='utf-8') as f:
+                            f.write(json.dumps(empty_scene, indent=4))
+                        
+                        self.load_diagrams_from_dir()
+                        for i in range(self.diagrams_list.count()):
+                            item = self.diagrams_list.item(i)
+                            if item.data(Qt.UserRole) == path:
+                                self.diagrams_list.setCurrentItem(item)
+                                self.open_selected_diagram(item)
+                                break
+                    except Exception as e:
+                        QMessageBox.critical(self, "Error", str(e))
 
     @Slot()
     def open_selected_diagram(self, item):
-        self.current_diagram_file = item.data(Qt.UserRole)
-        if os.path.exists(self.current_diagram_file):
+        is_backend = item.data(Qt.UserRole + 1)
+        data = None
+        
+        if is_backend:
+            diagram_id = item.data(Qt.UserRole)
+            self.current_diagram_id = diagram_id
+            self.current_diagram_file = None
+            
+            # Cargar desde backend
+            url = f"http://localhost:9000/api/diagrams/{diagram_id}"
+            data = send_api_request(url)
+        else:
+            self.current_diagram_id = None
+            self.current_diagram_file = item.data(Qt.UserRole)
+            if self.current_diagram_file and os.path.exists(self.current_diagram_file):
+                try:
+                    with open(self.current_diagram_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                except Exception as e:
+                    print(f"Error al leer archivo local: {e}")
+        
+        if data:
             try:
-                with open(self.current_diagram_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
                 diagram_type = data.get("type", "Advanced Architecture")
                 
                 # Load models based on diagram type
@@ -1152,7 +1212,6 @@ class ProjectDiagramTab(QWidget):
                     self.registry = self.register_models()
                 
                 # We update the scene to reflect only the allowed node models
-                old_scene = self.scene
                 self.scene = FlowScene(registry=self.registry)
                 self.scene.node_context_menu.connect(self.show_node_context_menu)
                 self.scene.node_created.connect(self.on_node_created)
@@ -1179,7 +1238,20 @@ class ProjectDiagramTab(QWidget):
 
     @Slot()
     def save_current_diagram(self):
-        if self.current_diagram_file:
+        if hasattr(self, 'current_diagram_id') and self.current_diagram_id:
+            try:
+                data = self.scene.__getstate__()
+                url = f"http://localhost:9000/api/diagrams/{self.current_diagram_id}"
+                payload = {
+                    "nodes": data.get("nodes", []),
+                    "connections": data.get("connections", [])
+                }
+                response = send_api_request(url, method="PUT", data=payload)
+                if not response:
+                    print("Error al guardar el diagrama en el backend.")
+            except Exception as e:
+                print(f"Error al guardar diagrama en backend: {e}")
+        elif self.current_diagram_file:
             try:
                 data = self.scene.__getstate__()
                 with open(self.current_diagram_file, 'w', encoding='utf-8') as f:
@@ -1200,7 +1272,8 @@ class ProjectDiagramTab(QWidget):
         current_item = self.diagrams_list.currentItem()
         if not current_item: return
         
-        self.to_delete_path = current_item.data(Qt.UserRole)
+        self.to_delete_is_backend = current_item.data(Qt.UserRole + 1)
+        self.to_delete_val = current_item.data(Qt.UserRole)
         name = current_item.text().replace("📐 ", "")
         
         self.confirm_label.setText(f"Delete Diagram '{name}'?")
@@ -1250,14 +1323,22 @@ class ProjectDiagramTab(QWidget):
 
     @Slot()
     def perform_delete(self):
-        if hasattr(self, 'to_delete_path') and self.to_delete_path:
+        if hasattr(self, 'to_delete_val') and self.to_delete_val:
             try:
-                if os.path.exists(self.to_delete_path):
-                    os.remove(self.to_delete_path)
-                
-                if self.current_diagram_file == self.to_delete_path:
-                    self.current_diagram_file = None
-                    self.clear_scene()
+                if getattr(self, 'to_delete_is_backend', False):
+                    url = f"http://localhost:9000/api/diagrams/{self.to_delete_val}"
+                    send_api_request(url, method="DELETE")
+                    
+                    if self.current_diagram_id == self.to_delete_val:
+                        self.current_diagram_id = None
+                        self.clear_scene()
+                else:
+                    if os.path.exists(self.to_delete_val):
+                        os.remove(self.to_delete_val)
+                    
+                    if self.current_diagram_file == self.to_delete_val:
+                        self.current_diagram_file = None
+                        self.clear_scene()
                 
                 self.load_diagrams_from_dir()
             except Exception as e:
@@ -1376,8 +1457,9 @@ class ProjectDiagramTab(QWidget):
 
     @Slot(QListWidgetItem)
     def on_diagram_renamed(self, item):
-        old_path = item.data(Qt.UserRole)
-        if not old_path or not os.path.exists(old_path):
+        is_backend = item.data(Qt.UserRole + 1)
+        old_val = item.data(Qt.UserRole)
+        if not old_val:
             return
 
         new_name = item.text()
@@ -1387,29 +1469,50 @@ class ProjectDiagramTab(QWidget):
             self.diagrams_list.blockSignals(True)
             item.setText(f"📐 {new_name}")
             self.diagrams_list.blockSignals(False)
-            
-        old_dir = os.path.dirname(old_path)
-        new_path = os.path.join(old_dir, new_name)
 
-        if old_path != new_path:
-            # force .json extension
-            if not new_path.endswith('.json'):
-                new_path += '.json'
-                
-            try:
-                os.rename(old_path, new_path)
-                item.setData(Qt.UserRole, new_path)
-                if self.current_diagram_file == old_path:
-                    self.current_diagram_file = new_path
-                    
-                # Fix up name to include .json if it didn't
-                final_name = os.path.basename(new_path)
+        if is_backend:
+            # Renombrar en el backend
+            url = f"http://localhost:9000/api/diagrams/{old_val}"
+            payload = {"name": new_name}
+            response = send_api_request(url, method="PUT", data=payload)
+            if response:
+                final_name = response.get("name", new_name)
+                if not final_name.lower().endswith(".json"):
+                    final_name += ".json"
                 self.diagrams_list.blockSignals(True)
                 item.setText(f"📐 {final_name}")
                 self.diagrams_list.blockSignals(False)
-                
-            except Exception as e:
+            else:
                 self.diagrams_list.blockSignals(True)
-                item.setText(f"📐 {os.path.basename(old_path)}")
+                item.setText(f"📐 {new_name}")
                 self.diagrams_list.blockSignals(False)
-                QMessageBox.critical(self, "Error", f"Could not rename diagram: {e}")
+                self.load_diagrams_from_dir()
+        else:
+            old_path = old_val
+            if not os.path.exists(old_path):
+                return
+            old_dir = os.path.dirname(old_path)
+            new_path = os.path.join(old_dir, new_name)
+
+            if old_path != new_path:
+                # force .json extension
+                if not new_path.endswith('.json'):
+                    new_path += '.json'
+                    
+                try:
+                    os.rename(old_path, new_path)
+                    item.setData(Qt.UserRole, new_path)
+                    if self.current_diagram_file == old_path:
+                        self.current_diagram_file = new_path
+                        
+                    # Fix up name to include .json if it didn't
+                    final_name = os.path.basename(new_path)
+                    self.diagrams_list.blockSignals(True)
+                    item.setText(f"📐 {final_name}")
+                    self.diagrams_list.blockSignals(False)
+                    
+                except Exception as e:
+                    self.diagrams_list.blockSignals(True)
+                    item.setText(f"📐 {os.path.basename(old_path)}")
+                    self.diagrams_list.blockSignals(False)
+                    QMessageBox.critical(self, "Error", f"Could not rename diagram: {e}")
