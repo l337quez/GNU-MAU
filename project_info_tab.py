@@ -13,9 +13,13 @@ class ProjectInfoTab(QWidget):
         self.main_window = main_window
         self.current_project_name = ""
         self.info_layout = QVBoxLayout()
+        self.info_layout.setContentsMargins(15, 15, 15, 15)
+        self.info_layout.setSpacing(8)
 
         self.project_name_label = QLabel()
-        self.project_name_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 5px;")
+        self.project_name_label.setFixedHeight(26)
+        self.project_name_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.project_name_label.setStyleSheet("margin: 0px; padding: 0px;")
         self.info_layout.addWidget(self.project_name_label)
 
 

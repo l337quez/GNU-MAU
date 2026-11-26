@@ -101,10 +101,14 @@ class ProjectNoteTab(QWidget):
         """
 
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(15, 15, 15, 15)
+        self.main_layout.setSpacing(8)
 
         # Project contextual header
         self.project_header_label = QLabel()
-        self.project_header_label.setStyleSheet("margin-bottom: 4px;")
+        self.project_header_label.setFixedHeight(26)
+        self.project_header_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.project_header_label.setStyleSheet("margin: 0px; padding: 0px;")
         self.main_layout.addWidget(self.project_header_label)
 
         self.explorer_group = QWidget()
