@@ -1,4 +1,5 @@
 import sys, os, subprocess, webbrowser
+import html
 import json
 from PySide6.QtGui import QTextCursor, QTextCharFormat, QTextBlockFormat 
 
@@ -8,6 +9,21 @@ try:
     from dotenv import load_dotenv  # type: ignore
 except ImportError:
     load_dotenv = None  # Handled in main.py
+
+
+def format_project_header(project_name: str) -> str:
+    """Encabezado HTML reutilizable: prefijo i18n + nombre del proyecto."""
+    from i18n import tr
+
+    if not project_name:
+        return ""
+    prefix = html.escape(str(tr("project_prefix")))
+    safe_name = html.escape(str(project_name))
+    return (
+        f"<span style='color: #9cdcfe; font-size: 13px; font-weight: 600; "
+        f"text-transform: uppercase; letter-spacing: 0.5px;'>{prefix}</span> "
+        f"<span style='font-size: 16px; font-weight: bold;'>{safe_name}</span>"
+    )
 
 
 def is_windows():

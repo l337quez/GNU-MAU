@@ -11,7 +11,7 @@ from bson.objectid import ObjectId
 # MAU imports
 from todo_text_editor import TodoTextEditor
 from emoji_picker import EmojiPicker
-from utils import clean_text_format
+from utils import clean_text_format, format_project_header
 from i18n import tr
 from kanban_view import KanbanBoardWidget
 
@@ -21,6 +21,7 @@ class ProjectTodoTab(QWidget):
         self.main_window = main_window
         self.project_id = project_id
         self.todos_collection = self.main_window.db.todos
+        self.current_project_name = ""
         self.current_todo_id = None
         self.current_todo_item = None  # Rastreo explícito del item seleccionado
 
@@ -31,6 +32,11 @@ class ProjectTodoTab(QWidget):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(15, 15, 15, 15)
         self.main_layout.setSpacing(5)
+
+        # Project contextual header
+        self.project_header_label = QLabel()
+        self.project_header_label.setStyleSheet("margin-bottom: 4px;")
+        self.main_layout.addWidget(self.project_header_label)
 
         # Confirmation Widget (Inline - Top Level)
         self.confirmation_widget = QWidget()
@@ -513,7 +519,14 @@ class ProjectTodoTab(QWidget):
             elif hasattr(self.main_window, "statusBar"):
                 self.main_window.statusBar().showMessage(tr("nothing_to_copy"), 2500)
 
+    def update_project_name(self, name):
+        """Actualiza el encabezado contextual con el nombre del proyecto."""
+        self.current_project_name = name or ""
+        self.project_header_label.setText(format_project_header(self.current_project_name))
+
     def retranslate_ui(self):
+        if getattr(self, "current_project_name", ""):
+            self.project_header_label.setText(format_project_header(self.current_project_name))
         self.confirm_label.setText(tr("delete_todo_confirm"))
         self.confirm_yes_btn.setText(tr("btn_yes_delete"))
         self.confirm_no_btn.setText(tr("btn_cancel"))

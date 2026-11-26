@@ -979,6 +979,10 @@ class MainWindow(QMainWindow):
         self.project_tab.clear_table() 
         self.project_tab.change_icon_button.setEnabled(False) 
         self.project_tab.reset_icon_preview()
+        self.project_info_tab.update_project_name("")
+        self.project_todo_tab.update_project_name("")
+        self.project_note_tab.update_project_name("")
+        self.project_diagram_tab.update_project_name("")
         self.stacked_widget.setCurrentWidget(self.tabs)
         self.tabs.setCurrentWidget(self.project_tab)
 
@@ -1016,8 +1020,14 @@ class MainWindow(QMainWindow):
         # Retranslate child tabs
         if hasattr(self, "project_tab") and hasattr(self.project_tab, "retranslate_ui"):
             self.project_tab.retranslate_ui()
+        if hasattr(self, "project_info_tab") and hasattr(self.project_info_tab, "retranslate_ui"):
+            self.project_info_tab.retranslate_ui()
         if hasattr(self, "project_todo_tab") and hasattr(self.project_todo_tab, "retranslate_ui"):
             self.project_todo_tab.retranslate_ui()
+        if hasattr(self, "project_note_tab") and hasattr(self.project_note_tab, "retranslate_ui"):
+            self.project_note_tab.retranslate_ui()
+        if hasattr(self, "project_diagram_tab") and hasattr(self.project_diagram_tab, "retranslate_ui"):
+            self.project_diagram_tab.retranslate_ui()
         if hasattr(self, "setting_tab") and hasattr(self.setting_tab, "retranslate_ui"):
             self.setting_tab.retranslate_ui()
         if hasattr(self, "about_tab") and hasattr(self.about_tab, "retranslate_ui"):
@@ -1143,6 +1153,12 @@ class MainWindow(QMainWindow):
         self.project_todo_tab.update_project_id(self.current_project_id)
         self.project_note_tab.set_project_id(self.current_project_id)
         self.project_diagram_tab.set_project_id(self.current_project_id)
+
+        # Encabezado contextual del proyecto en las 4 pestañas
+        self.project_info_tab.update_project_name(self.current_project_name)
+        self.project_todo_tab.update_project_name(self.current_project_name)
+        self.project_note_tab.update_project_name(self.current_project_name)
+        self.project_diagram_tab.update_project_name(self.current_project_name)
 
         # Sincronizar filtro de categories en Information tab (desde info items)
         info = project.get("info", {})

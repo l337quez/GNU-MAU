@@ -6,7 +6,7 @@ from PySide6.QtGui import (QFont, QTextCursor, Qt, QTextCharFormat)
 from PySide6.QtCore import (Qt, Slot, QSize)
 
 import os, markdown2
-from utils import get_resource_path, clean_text_format
+from utils import get_resource_path, clean_text_format, format_project_header
 from emoji_picker import EmojiPicker
 from todo_text_editor import TodoTextEditor
 
@@ -43,6 +43,7 @@ class ProjectNoteTab(QWidget):
         self.main_window = main_window
         self.setObjectName("ProjectNoteTab")
         self.current_note_file = None
+        self.current_project_name = ""
         self.project_id = None
         self.notes_dir = ""
         self.is_rich_text = False 
@@ -100,6 +101,11 @@ class ProjectNoteTab(QWidget):
         """
 
         self.main_layout = QVBoxLayout(self)
+
+        # Project contextual header
+        self.project_header_label = QLabel()
+        self.project_header_label.setStyleSheet("margin-bottom: 4px;")
+        self.main_layout.addWidget(self.project_header_label)
 
         self.explorer_group = QWidget()
         self.explorer_layout = QVBoxLayout(self.explorer_group)
@@ -257,6 +263,15 @@ class ProjectNoteTab(QWidget):
                 super().keyPressEvent(event)
         else:
             super().keyPressEvent(event)
+
+    def update_project_name(self, name):
+        """Actualiza el encabezado contextual con el nombre del proyecto."""
+        self.current_project_name = name or ""
+        self.project_header_label.setText(format_project_header(self.current_project_name))
+
+    def retranslate_ui(self):
+        if getattr(self, "current_project_name", ""):
+            self.project_header_label.setText(format_project_header(self.current_project_name))
 
     def set_project_id(self, project_id):
         self.project_id = str(project_id)

@@ -31,6 +31,7 @@ TRANSLATIONS = {
         "tab_diagram": "Diagram",
         
         # Project Tab
+        "project_prefix": "Project:",
         "project_name": "Project name",
         "project_description": "Project description",
         "key_placeholder": "Key...",
@@ -122,6 +123,7 @@ TRANSLATIONS = {
         "tab_diagram": "Diagramas",
         
         # Project Tab
+        "project_prefix": "Proyecto:",
         "project_name": "Nombre del proyecto",
         "project_description": "Descripción del proyecto",
         "key_placeholder": "Clave...",

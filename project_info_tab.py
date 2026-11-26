@@ -4,15 +4,17 @@ from PySide6.QtCore import Slot, Qt
 from PySide6.QtGui import QIcon, QClipboard
 import json, sys, os
 from bson.objectid import ObjectId
-from utils import get_resource_path, make_relative_path, open_system_terminal, open_browser, is_windows
+from utils import (format_project_header, get_resource_path, make_relative_path,
+                   open_system_terminal, open_browser, is_windows)
 
 class ProjectInfoTab(QWidget):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
+        self.current_project_name = ""
         self.info_layout = QVBoxLayout()
 
-        self.project_name_label = QLabel("Project name")
+        self.project_name_label = QLabel()
         self.project_name_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 5px;")
         self.info_layout.addWidget(self.project_name_label)
 
@@ -94,8 +96,16 @@ class ProjectInfoTab(QWidget):
         self.set_editing_enabled(False)
 
 
+    def update_project_name(self, name):
+        """Actualiza el encabezado contextual con el nombre del proyecto."""
+        self.current_project_name = name or ""
+        self.project_name_label.setText(format_project_header(self.current_project_name))
+
+    def retranslate_ui(self):
+        self.update_project_name(self.current_project_name)
+
     def update_project_info(self, name, description, info):
-        self.project_name_label.setText(f"Project: {name}")
+        self.update_project_name(name)
         self.additional_info_table.setSortingEnabled(False)
         self.clear_table()
         info_dict = info if isinstance(info, dict) else {}

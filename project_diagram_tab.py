@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
 from PySide6.QtCore import Qt, Slot, QByteArray, QObject, QEvent
 import os
 import json
+from utils import format_project_header
 
 from qtpynodeeditor import (FlowScene, FlowView, DataModelRegistry, 
                             NodeDataModel, PortType, NodeDataType,
@@ -944,17 +945,26 @@ class ProjectDiagramTab(QWidget):
         self.main_window = main_window
         self.setObjectName("ProjectDiagramTab")
         self.current_diagram_file = None
+        self.current_project_name = ""
         self.project_id = None
         self.diagrams_dir = ""
 
         if not HAS_NODE_EDITOR:
             layout = QVBoxLayout(self)
+            self.project_header_label = QLabel()
+            self.project_header_label.setStyleSheet("margin-bottom: 4px;")
+            layout.addWidget(self.project_header_label)
             layout.addWidget(QLabel("Error: qtpynodeeditor is not installed. Please run `poetry add qtpynodeeditor`"))
             return
 
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(15, 15, 15, 15)
         self.main_layout.setSpacing(5)
+
+        # Project contextual header
+        self.project_header_label = QLabel()
+        self.project_header_label.setStyleSheet("margin-bottom: 4px;")
+        self.main_layout.addWidget(self.project_header_label)
 
         # Confirmation Widget (Inline - Top Level)
         from PySide6.QtWidgets import QSizePolicy
@@ -1082,6 +1092,16 @@ class ProjectDiagramTab(QWidget):
                 super().keyPressEvent(event)
         else:
             super().keyPressEvent(event)
+
+    def update_project_name(self, name):
+        """Actualiza el encabezado contextual con el nombre del proyecto."""
+        self.current_project_name = name or ""
+        if hasattr(self, "project_header_label"):
+            self.project_header_label.setText(format_project_header(self.current_project_name))
+
+    def retranslate_ui(self):
+        if getattr(self, "current_project_name", ""):
+            self.project_header_label.setText(format_project_header(self.current_project_name))
 
     def set_project_id(self, project_id):
         self.project_id = str(project_id)
